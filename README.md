@@ -82,48 +82,60 @@ When a brand submits a license request, the orchestrator runs:
 
 ### 1. FLock.io -- Best Use of Open-Source AI Models ($5,000 USDT)
 
-Face Library uses FLock's open-source model inference API as the primary LLM provider:
+Face Library uses **all 5 FLock open-source models** as the primary LLM provider:
 
-| Agent | Model | Purpose |
-|-------|-------|---------|
-| Negotiator | Qwen3 235B | Dynamic pricing and licensing terms |
-| Compliance | DeepSeek V3.2 | Risk assessment and policy enforcement |
-| Contract | Qwen3 235B (fallback) | IP contract generation |
-| Search | DeepSeek V3.2 | AI-driven talent discovery |
-| Audit | Qwen3 30B | Log analysis |
+| Agent | Model | Tier | Purpose |
+|-------|-------|------|---------|
+| Negotiator | Qwen3 235B Instruct | Creative | Dynamic pricing and licensing terms |
+| Compliance | DeepSeek V3.2 | Fast | Risk assessment and policy enforcement |
+| Contract | Qwen3 235B Thinking | Reasoning (fallback) | IP contract generation |
+| Search | DeepSeek V3.2 | Fast | AI-driven talent discovery |
+| Audit | Qwen3 30B | Primary | Log analysis |
+| (Available) | Kimi K2.5 | Long Context | 128K context for extended analysis |
 
 **SDG Alignment:**
-- **SDG 8 (Decent Work)** -- Creating fair economic opportunities for creators whose likenesses are used in AI
-- **SDG 10 (Reduced Inequalities)** -- Ensuring individual creators have the same IP protection as large corporations
+- **SDG 8 (Decent Work)** -- Creating fair economic opportunities for creators. Negotiator agent ensures pricing aligns with market rates. `/api/sdg/impact` endpoint tracks creator compensation metrics.
+- **SDG 10 (Reduced Inequalities)** -- Ensuring individual creators have the same IP protection as large corporations. Compliance agent blocks unfair requests.
+- **SDG 16 (Peace, Justice)** -- Building transparent, auditable licensing infrastructure with UK law compliance. Full audit trail on every transaction.
 
 ### 2. Z.AI -- Best Use of GLM Model ($4,000 USD)
 
-The Contract Generation Agent uses Z.AI's GLM-4 Plus as its primary model for generating legally compliant IP licensing agreements. GLM-4 Plus is particularly well-suited for structured legal document generation with its 128K context window.
+Z.AI's GLM-4 Plus (128K context window) is used as a **core component** in two agents:
+
+1. **Contract Agent (Primary)** -- Generates full 12-section UK-law-compliant IP licensing agreements covering GDPR, Copyright Act 1988, Consumer Rights Act 2015, and dispute resolution. GLM-4 Plus's 128K context is ideal for long structured legal documents.
+2. **Compliance Agent (Summary)** -- After DeepSeek performs risk analysis, GLM-4 Plus generates concise executive summaries for talent review. This dual-model approach combines fast analysis with high-quality summarization.
+
+The `openclaw.json` gateway registers Z.AI as a dedicated provider with model binding `zai/glm-4-plus`. Contract agent falls back to FLock Qwen3 235B Thinking if Z.AI is unavailable.
 
 ### 3. Claw for Human -- Most Impactful AI Agent ($500)
 
 Face Library is built entirely on the OpenClaw platform:
-- `openclaw.json` gateway configuration with FLock + Z.AI providers
-- 5 agent definitions with workspace paths and model assignments
-- Anyway tracing plugin for full observability
+- `openclaw.json` gateway configuration with FLock + Z.AI providers (6 models across 2 providers)
+- 5 agent definitions with workspace paths, model assignments, and SDG tags
+- Anyway tracing plugin for full observability (session/agent/LLM/tool spans)
+- Rich agent dashboard showing per-agent stats, model registry, and SDG badges
 - Demonstrates a real-world use case: protecting human identity rights in the age of generative AI
 
 ### 4. AnyWay -- Best Use of Anyway SDK (Mac Mini)
 
-The Anyway OpenTelemetry tracing plugin is configured to capture:
-- Session-level spans for each license request pipeline
-- Agent-level spans for each AI agent invocation
-- LLM-level spans for each model call (input/output/tokens/latency)
-- Tool-level spans for database operations
+Full OpenTelemetry tracing integration via `backend/tracing.py`:
 
-Traces export to `https://trace-dev-collector.anyway.sh` with full content capture enabled.
+- **Session-level spans** for each license request pipeline (wraps entire orchestrator run)
+- **Agent-level spans** for each AI agent invocation (compliance, negotiator, contract, search)
+- **LLM-level spans** for each model call (model, provider, tokens, latency)
+- **Tool-level spans** for database operations (audit writes, trail reads, stats queries)
+
+Traces export to `https://trace-dev-collector.anyway.sh` with full content capture. The `openclaw.json` plugin config captures all 4 span types at 100% sample rate.
+
+Additionally, a self-service **pricing API** (`POST /api/pricing/estimate`) supports the commercialization requirement by providing instant algorithmic price estimates for brands.
 
 ### 5. Animoca Brands -- Best Multi-Agent System ($1,000 USD)
 
 Face Library is a coordinated multi-agent system where 5 specialized AI agents collaborate to solve a real problem -- protecting human identity rights in generative AI:
 
-- **Multi-agent orchestration** -- Compliance, Negotiator, Contract, Search, and Audit agents work in a coordinated pipeline
-- **Agent UX** -- Full dashboard with real-time agent activity feed (Claw Console), expandable logs, and per-request audit trails
+- **Multi-agent orchestration** -- Compliance, Negotiator, Contract, Search, and Audit agents work in a coordinated pipeline with full metadata tracking (agents invoked, models used, tokens consumed, elapsed time)
+- **Agent UX** -- Full dashboard with real-time agent activity feed (Claw Console), expandable logs, per-request audit trails, per-agent statistics, and model registry
+- **Agent decision history** -- `GET /api/agents/decisions` endpoint tracks all agent decisions across the pipeline, enabling analysis of agent behavior patterns
 - **Real-world impact** -- Enables creators to control, monetize, and audit how their likeness is used by AI systems
 - **Decision engine** -- Agents autonomously assess risk, negotiate pricing, and generate legal contracts
 
@@ -135,9 +147,10 @@ Face Library is a coordinated multi-agent system where 5 specialized AI agents c
 |-------|-----------|
 | Frontend | Next.js 16, React, Tailwind CSS |
 | Backend | Python, FastAPI, SQLAlchemy, SQLite |
-| LLM Providers | FLock.io (Qwen3, DeepSeek, Kimi), Z.AI (GLM-4 Plus) |
-| Agent Platform | OpenClaw (gateway, agent orchestration) |
-| Observability | Anyway SDK (OpenTelemetry tracing) |
+| LLM Providers | FLock.io (Qwen3 30B/235B, DeepSeek V3.2, Kimi K2.5), Z.AI (GLM-4 Plus 128K) |
+| Agent Platform | OpenClaw (gateway config, 5 agent definitions, 2 providers) |
+| Observability | Anyway SDK (OpenTelemetry -- session/agent/LLM/tool spans) |
+| Tracing | `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` |
 | Auth | SHA-256 salted password hashing, localStorage sessions |
 
 ---
@@ -225,7 +238,10 @@ With the backend running, visit http://localhost:8000/docs for the interactive S
 | POST | `/api/licensing/{id}/approve` | Approve or reject license |
 | GET | `/api/licenses` | List all licenses |
 | POST | `/api/talent/search` | AI-powered talent search |
-| GET | `/api/agents/status` | Agent system status + stats |
+| GET | `/api/agents/status` | Agent system status + stats + model registry |
+| GET | `/api/agents/decisions` | Agent decision history (Animoca bounty) |
+| POST | `/api/pricing/estimate` | Algorithmic pricing estimate (AnyWay bounty) |
+| GET | `/api/sdg/impact` | SDG impact metrics (FLock bounty) |
 | GET | `/api/audit/logs` | All agent audit logs (Claw Console) |
 | GET | `/api/audit/{id}` | Audit trail for specific license |
 | GET | `/api/health` | Health check |

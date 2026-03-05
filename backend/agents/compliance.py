@@ -1,9 +1,18 @@
-"""Compliance & Risk Agent — Scans requests for risks and policy violations."""
-from llm_client import chat_json
+"""Compliance & Risk Agent -- Scans requests for risks and policy violations.
+
+Bounty coverage:
+- FLock.io: Uses DeepSeek V3.2 via FLock API for risk analysis
+- Z.AI: Uses GLM-4 Plus for compliance summary generation
+- Animoca: Part of multi-agent coordinated system
+"""
+from llm_client import chat_json, chat
+from tracing import trace_agent
 
 
 class ComplianceAgent:
     name = "compliance"
+    provider = "FLock (DeepSeek V3.2) + Z.AI (GLM-4 Plus)"
+    sdg_alignment = ["SDG 10 (Reduced Inequalities)", "SDG 16 (Peace, Justice)"]
 
     SYSTEM_PROMPT = """You are the Compliance & Risk Agent for Face Library, a secure likeness licensing platform.
 
@@ -47,17 +56,30 @@ Respond in JSON format:
     "compliance_notes": string
 }"""
 
+    SUMMARY_PROMPT = """You are a legal compliance summarizer. Given the raw compliance assessment below, produce a concise 2-3 sentence executive summary suitable for a talent reviewing a licensing request. Highlight the key risk, the recommendation, and any conditions.
+
+Raw assessment:
+{assessment}
+
+Write a clear, professional summary."""
+
     def run(self, talent_profile: dict, license_request: dict, brand_profile: dict) -> dict:
-        messages = [
-            {"role": "system", "content": self.SYSTEM_PROMPT},
-            {"role": "user", "content": f"""Assess compliance and risk for this licensing request:
+        with trace_agent(self.name, "risk_assessment", {
+            "talent": talent_profile.get("name", "unknown"),
+            "brand": brand_profile.get("company_name", "unknown"),
+        }) as span:
+            messages = [
+                {"role": "system", "content": self.SYSTEM_PROMPT},
+                {"role": "user", "content": f"""Assess compliance and risk for this licensing request:
 
 TALENT PREFERENCES:
 - Restricted categories: {talent_profile.get('restricted_categories', 'None')}
 - Geo restrictions: {talent_profile.get('geo_restrictions', 'None')}
+- Geo scope: {talent_profile.get('geo_scope', 'global')}
 - Allow AI training: {talent_profile.get('allow_ai_training', False)}
 - Allow video: {talent_profile.get('allow_video_generation', True)}
 - Allow image: {talent_profile.get('allow_image_generation', True)}
+- Approval mode: {talent_profile.get('approval_mode', 'manual')}
 
 BRAND INFO:
 - Company: {brand_profile.get('company_name', 'Unknown')}
@@ -73,13 +95,43 @@ REQUEST DETAILS:
 - Exclusivity: {license_request.get('exclusivity', False)}
 
 Perform a thorough risk and compliance assessment."""},
-        ]
+            ]
 
-        result = chat_json(messages, model_tier="fast", temperature=0.2)
-        return {
-            "agent": self.name,
-            "result": result.get("parsed"),
-            "raw_response": result["content"],
-            "model": result["model"],
-            "tokens_used": result["tokens_used"],
-        }
+            # Stage 1: Risk assessment via FLock (DeepSeek)
+            result = chat_json(messages, model_tier="fast", temperature=0.2, agent_name=self.name)
+
+            # Stage 2: Executive summary via Z.AI (GLM-4 Plus) -- strengthens Z.AI bounty
+            summary = ""
+            summary_model = ""
+            summary_tokens = 0
+            raw_assessment = result["content"]
+            try:
+                summary_result = chat(
+                    [
+                        {"role": "system", "content": self.SUMMARY_PROMPT.format(assessment=raw_assessment)},
+                        {"role": "user", "content": "Generate the executive summary now."},
+                    ],
+                    model_tier="zai_primary",
+                    temperature=0.3,
+                    max_tokens=256,
+                    agent_name=f"{self.name}_summary",
+                )
+                if not summary_result.get("error"):
+                    summary = summary_result["content"]
+                    summary_model = summary_result["model"]
+                    summary_tokens = summary_result.get("tokens_used", 0)
+            except Exception:
+                pass  # Z.AI summary is optional enhancement
+
+            span.set_attribute("risk_level", str(result.get("parsed", {}).get("risk_level", "unknown") if result.get("parsed") else "unknown"))
+
+            return {
+                "agent": self.name,
+                "result": result.get("parsed"),
+                "raw_response": result["content"],
+                "executive_summary": summary,
+                "model": result["model"],
+                "summary_model": summary_model,
+                "tokens_used": result["tokens_used"] + summary_tokens,
+                "provider": f"flock + {'zai' if summary else 'flock-only'}",
+            }

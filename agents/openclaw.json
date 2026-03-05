@@ -1,4 +1,8 @@
 {
+  "name": "face-library",
+  "version": "1.0.0",
+  "description": "Secure AI Likeness Licensing Infrastructure -- Multi-agent platform protecting human identity rights in generative AI",
+
   "env": {
     "FLOCK_API_KEY": "${FLOCK_API_KEY}",
     "ZAI_API_KEY": "${ZAI_API_KEY}",
@@ -23,7 +27,7 @@
           },
           {
             "id": "qwen3-235b-a22b-instruct-2507",
-            "name": "Qwen3 235B (Primary)",
+            "name": "Qwen3 235B (Creative/Negotiation)",
             "reasoning": false,
             "input": ["text"],
             "contextWindow": 32000,
@@ -31,7 +35,7 @@
           },
           {
             "id": "qwen3-235b-a22b-thinking-2507",
-            "name": "Qwen3 235B Thinking (Reasoning)",
+            "name": "Qwen3 235B Thinking (Reasoning/Fallback)",
             "reasoning": true,
             "input": ["text"],
             "contextWindow": 32000,
@@ -39,7 +43,7 @@
           },
           {
             "id": "deepseek-v3.2",
-            "name": "DeepSeek V3.2 (Coding/Analysis)",
+            "name": "DeepSeek V3.2 (Analysis/Compliance)",
             "reasoning": false,
             "input": ["text"],
             "contextWindow": 64000,
@@ -47,7 +51,7 @@
           },
           {
             "id": "kimi-k2.5",
-            "name": "Kimi K2.5",
+            "name": "Kimi K2.5 (Long Context)",
             "reasoning": false,
             "input": ["text"],
             "contextWindow": 128000,
@@ -62,7 +66,7 @@
         "models": [
           {
             "id": "glm-4-plus",
-            "name": "GLM-4 Plus (Contract Generation)",
+            "name": "GLM-4 Plus (Contract Generation + Compliance Summary)",
             "reasoning": false,
             "input": ["text"],
             "contextWindow": 128000,
@@ -76,29 +80,56 @@
   "agents": {
     "list": [
       {
-        "id": "negotiator",
-        "workspace": "~/.openclaw/face-library/negotiator",
-        "model": { "primary": "flock/qwen3-235b-a22b-instruct-2507" }
+        "id": "compliance",
+        "name": "Compliance & Risk Agent",
+        "description": "Assesses content risk, brand risk, legal risk, ethical risk, and geographic risk. Uses FLock DeepSeek for analysis and Z.AI GLM for executive summaries.",
+        "workspace": "~/.openclaw/face-library/compliance",
+        "model": {
+          "primary": "flock/deepseek-v3.2",
+          "secondary": "zai/glm-4-plus"
+        },
+        "sdg": ["SDG 10", "SDG 16"]
       },
       {
-        "id": "compliance",
-        "workspace": "~/.openclaw/face-library/compliance",
-        "model": { "primary": "flock/deepseek-v3.2" }
+        "id": "negotiator",
+        "name": "Negotiator Agent",
+        "description": "Proposes dynamic pricing and licensing terms that protect talent interests while remaining commercially viable. Ensures SDG 8 fair compensation.",
+        "workspace": "~/.openclaw/face-library/negotiator",
+        "model": {
+          "primary": "flock/qwen3-235b-a22b-instruct-2507"
+        },
+        "sdg": ["SDG 8", "SDG 10"]
       },
       {
         "id": "contract",
+        "name": "IP Contract Generation Agent",
+        "description": "Generates full UK-law-compliant IP licensing agreements with 12 sections covering GDPR, Copyright Act 1988, and dispute resolution.",
         "workspace": "~/.openclaw/face-library/contract",
-        "model": { "primary": "zai/glm-4-plus" }
-      },
-      {
-        "id": "audit",
-        "workspace": "~/.openclaw/face-library/audit",
-        "model": { "primary": "flock/qwen3-30b-a3b-instruct-2507" }
+        "model": {
+          "primary": "zai/glm-4-plus",
+          "fallback": "flock/qwen3-235b-a22b-thinking-2507"
+        },
+        "sdg": ["SDG 16"]
       },
       {
         "id": "search",
+        "name": "Talent Search Agent",
+        "description": "AI-driven talent discovery for brands. Ranks talent by relevance, flags conflicts, and promotes fair representation.",
         "workspace": "~/.openclaw/face-library/search",
-        "model": { "primary": "flock/deepseek-v3.2" }
+        "model": {
+          "primary": "flock/deepseek-v3.2"
+        },
+        "sdg": ["SDG 8", "SDG 10"]
+      },
+      {
+        "id": "audit",
+        "name": "Audit & Traceability Agent",
+        "description": "Logs every agent action with timestamps, model info, and token usage. Provides full audit trails, per-agent statistics, and decision history.",
+        "workspace": "~/.openclaw/face-library/audit",
+        "model": {
+          "primary": "local"
+        },
+        "sdg": ["SDG 16"]
       }
     ],
     "defaults": {
@@ -117,7 +148,8 @@
           "serviceName": "face-library",
           "captureContent": true,
           "sampleRate": 1.0,
-          "flushIntervalMs": 5000
+          "flushIntervalMs": 5000,
+          "spanTypes": ["session", "agent", "llm", "tool"]
         }
       }
     }

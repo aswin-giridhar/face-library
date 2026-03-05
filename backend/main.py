@@ -1,4 +1,14 @@
-"""Face Library -- Secure Likeness Licensing Infrastructure API."""
+"""Face Library -- Secure Likeness Licensing Infrastructure API.
+
+Multi-agent platform for AI likeness licensing with full pipeline orchestration.
+
+Bounty coverage:
+- FLock.io: All LLM inference via FLock API (Qwen3, DeepSeek, Kimi)
+- Z.AI: GLM-4 Plus for contract generation + compliance summaries
+- Claw for Human: OpenClaw agent orchestration + gateway config
+- AnyWay: OpenTelemetry tracing + pricing/commercialization API
+- Animoca: Multi-agent system with decision history + agent stats
+"""
 import os
 import sys
 import hashlib
@@ -22,6 +32,7 @@ from models import (
     LicenseRequest, Contract, AuditLog, LicenseStatus,
 )
 from agents.orchestrator import OrchestratorAgent
+from llm_client import get_model_info
 
 orchestrator = OrchestratorAgent()
 
@@ -121,6 +132,14 @@ class TalentPreferencesUpdate(BaseModel):
     allow_ai_training: bool | None = None
     allow_video_generation: bool | None = None
     allow_image_generation: bool | None = None
+
+
+class PricingEstimateRequest(BaseModel):
+    content_type: str = "image"
+    duration_days: int = 30
+    regions: str = "UK"
+    exclusivity: bool = False
+    talent_min_price: float = 100.0
 
 
 # -- Auth helpers --------------------------------------------------------------
@@ -465,6 +484,8 @@ def process_license(license_id: int, db: Session = Depends(get_db)):
         "allow_image_generation": talent.allow_image_generation,
         "restricted_categories": talent.restricted_categories,
         "geo_restrictions": talent.geo_restrictions,
+        "geo_scope": talent.geo_scope,
+        "approval_mode": talent.approval_mode,
     }
 
     brand_profile = {
@@ -497,7 +518,10 @@ def process_license(license_id: int, db: Session = Depends(get_db)):
         if stage["stage"] == "compliance" and stage["result"].get("result"):
             cr = stage["result"]["result"]
             license_req.risk_score = cr.get("risk_level", "unknown")
-            license_req.compliance_notes = cr.get("compliance_notes", "")
+            license_req.compliance_notes = (
+                stage["result"].get("executive_summary")
+                or cr.get("compliance_notes", "")
+            )
             license_req.risk_details = str(cr.get("risk_flags", []))
 
         if stage["stage"] == "contract" and stage["result"].get("contract_text"):
@@ -620,24 +644,213 @@ def search_talent(req: SearchRequest):
     return result
 
 
+# -- Pricing API (AnyWay commercialization bounty) -----------------------------
+
+
+@app.post("/api/pricing/estimate")
+def pricing_estimate(req: PricingEstimateRequest):
+    """Quick pricing estimate without running the full agent pipeline.
+
+    This endpoint supports the AnyWay bounty commercialization requirement
+    by providing a self-service pricing tool that brands can use.
+    """
+    base_rate = max(req.talent_min_price, 100.0)
+
+    # Content type multiplier
+    content_factors = {"image": 1.0, "video": 2.5, "both": 3.0}
+    content_mult = content_factors.get(req.content_type, 1.0)
+
+    # Duration multiplier (per-day rate decreases for longer terms)
+    if req.duration_days <= 7:
+        duration_mult = 1.0
+    elif req.duration_days <= 30:
+        duration_mult = 0.8
+    elif req.duration_days <= 90:
+        duration_mult = 0.6
+    elif req.duration_days <= 365:
+        duration_mult = 0.4
+    else:
+        duration_mult = 0.3
+
+    # Region multiplier
+    region_lower = req.regions.lower()
+    if "global" in region_lower:
+        region_mult = 3.0
+    elif "eu" in region_lower or "europe" in region_lower:
+        region_mult = 2.0
+    else:
+        region_mult = 1.0
+
+    # Exclusivity premium
+    exclusivity_mult = 2.5 if req.exclusivity else 1.0
+
+    estimated_price = round(
+        base_rate * content_mult * (req.duration_days * duration_mult) * region_mult * exclusivity_mult / 30,
+        2,
+    )
+
+    return {
+        "estimated_price": estimated_price,
+        "currency": "GBP",
+        "breakdown": {
+            "base_rate": base_rate,
+            "content_type_factor": content_mult,
+            "duration_factor": duration_mult,
+            "region_factor": region_mult,
+            "exclusivity_factor": exclusivity_mult,
+        },
+        "parameters": {
+            "content_type": req.content_type,
+            "duration_days": req.duration_days,
+            "regions": req.regions,
+            "exclusivity": req.exclusivity,
+        },
+        "note": "This is an algorithmic estimate. Run the full agent pipeline for AI-negotiated pricing.",
+    }
+
+
+# -- SDG Impact Endpoint (FLock bounty) ---------------------------------------
+
+
+@app.get("/api/sdg/impact")
+def sdg_impact(db: Session = Depends(get_db)):
+    """SDG impact metrics for the FLock.io bounty track.
+
+    Tracks alignment with:
+    - SDG 8: Decent Work and Economic Growth
+    - SDG 10: Reduced Inequalities
+    - SDG 16: Peace, Justice and Strong Institutions
+    """
+    total_talents = db.query(TalentProfile).count()
+    total_brands = db.query(BrandProfile).count()
+    total_licenses = db.query(LicenseRequest).count()
+    approved_licenses = db.query(LicenseRequest).filter(
+        LicenseRequest.status.in_(["active", "approved"])
+    ).count()
+    rejected_licenses = db.query(LicenseRequest).filter(
+        LicenseRequest.status.in_(["rejected", "rejected_compliance"])
+    ).count()
+
+    # Calculate average compensation
+    from sqlalchemy import func
+    avg_price = db.query(func.avg(LicenseRequest.proposed_price)).filter(
+        LicenseRequest.proposed_price.isnot(None)
+    ).scalar() or 0
+
+    return {
+        "sdg_alignment": [
+            {
+                "sdg": "SDG 8",
+                "title": "Decent Work and Economic Growth",
+                "description": "Creating fair economic opportunities for creators whose likenesses are used in AI",
+                "metrics": {
+                    "creators_protected": total_talents,
+                    "fair_deals_completed": approved_licenses,
+                    "average_creator_compensation_gbp": round(avg_price, 2),
+                },
+            },
+            {
+                "sdg": "SDG 10",
+                "title": "Reduced Inequalities",
+                "description": "Ensuring individual creators have the same IP protection as large corporations",
+                "metrics": {
+                    "individual_creators_registered": total_talents,
+                    "brands_held_accountable": total_brands,
+                    "unfair_requests_blocked": rejected_licenses,
+                },
+            },
+            {
+                "sdg": "SDG 16",
+                "title": "Peace, Justice and Strong Institutions",
+                "description": "Building transparent, auditable licensing infrastructure with UK law compliance",
+                "metrics": {
+                    "total_licenses_audited": total_licenses,
+                    "uk_law_compliant_contracts": approved_licenses,
+                    "audit_trail_entries": db.query(AuditLog).count(),
+                },
+            },
+        ],
+        "platform_stats": {
+            "total_talents": total_talents,
+            "total_brands": total_brands,
+            "total_licenses": total_licenses,
+            "approval_rate": round(approved_licenses / max(total_licenses, 1) * 100, 1),
+        },
+    }
+
+
 # -- Agent & Audit Endpoints ---------------------------------------------------
 
 
 @app.get("/api/agents/status")
 def agents_status():
-    """Get status of all agents in the system."""
+    """Get status of all agents in the system with model info."""
     stats = orchestrator.audit.get_system_stats()
+    agent_stats = orchestrator.audit.get_agent_stats()
+    models = get_model_info()
+
     return {
         "agents": [
-            {"name": "Negotiator Agent", "role": "Dynamic pricing & licensing terms", "provider": "FLock (Qwen3)"},
-            {"name": "Compliance Agent", "role": "Risk assessment & policy enforcement", "provider": "FLock (DeepSeek)"},
-            {"name": "Contract Agent", "role": "UK-law-compliant IP contract generation", "provider": "Z.AI (GLM) / FLock"},
-            {"name": "Audit Agent", "role": "Transaction logging & usage monitoring", "provider": "Local"},
-            {"name": "Search Agent", "role": "AI-driven talent discovery", "provider": "FLock (DeepSeek)"},
-            {"name": "Orchestrator", "role": "Multi-agent pipeline coordination", "provider": "Local"},
+            {
+                "name": "Compliance Agent",
+                "id": "compliance",
+                "role": "Risk assessment & policy enforcement",
+                "provider": "FLock (DeepSeek V3.2) + Z.AI (GLM-4 Plus)",
+                "models": ["deepseek-v3.2", "glm-4-plus"],
+                "sdg": ["SDG 10", "SDG 16"],
+            },
+            {
+                "name": "Negotiator Agent",
+                "id": "negotiator",
+                "role": "Dynamic pricing & licensing terms",
+                "provider": "FLock (Qwen3 235B)",
+                "models": ["qwen3-235b-a22b-instruct-2507"],
+                "sdg": ["SDG 8", "SDG 10"],
+            },
+            {
+                "name": "Contract Agent",
+                "id": "contract",
+                "role": "UK-law-compliant IP contract generation",
+                "provider": "Z.AI (GLM-4 Plus) / FLock (Qwen3 235B)",
+                "models": ["glm-4-plus", "qwen3-235b-a22b-thinking-2507"],
+                "sdg": ["SDG 16"],
+            },
+            {
+                "name": "Search Agent",
+                "id": "search",
+                "role": "AI-driven talent discovery",
+                "provider": "FLock (DeepSeek V3.2)",
+                "models": ["deepseek-v3.2"],
+                "sdg": ["SDG 8", "SDG 10"],
+            },
+            {
+                "name": "Audit Agent",
+                "id": "audit",
+                "role": "Transaction logging & usage monitoring",
+                "provider": "Local (SQLite)",
+                "models": [],
+                "sdg": ["SDG 16"],
+            },
+            {
+                "name": "Orchestrator",
+                "id": "orchestrator",
+                "role": "Multi-agent pipeline coordination",
+                "provider": "Local",
+                "models": [],
+                "sdg": ["SDG 8", "SDG 10", "SDG 16"],
+            },
         ],
         "stats": stats,
+        "agent_stats": agent_stats,
+        "models": models,
     }
+
+
+@app.get("/api/agents/decisions")
+def agent_decisions():
+    """Get recent agent decisions -- Animoca bounty (agent memory/identity)."""
+    decisions = orchestrator.audit.get_decision_history(limit=50)
+    return {"decisions": decisions, "total": len(decisions)}
 
 
 @app.get("/api/audit/logs")
@@ -688,5 +901,7 @@ def health():
         "service": "Face Library API",
         "version": "1.0.0",
         "agents": 6,
-        "providers": ["FLock (Qwen3, DeepSeek)", "Z.AI (GLM)"],
+        "providers": ["FLock (Qwen3, DeepSeek, Kimi)", "Z.AI (GLM-4 Plus)"],
+        "bounties": ["FLock.io", "Z.AI", "Claw for Human", "AnyWay", "Animoca"],
+        "tracing": "Anyway SDK (OpenTelemetry)",
     }

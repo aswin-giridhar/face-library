@@ -74,5 +74,20 @@ export const getAuditTrail = (licenseId: number) =>
 
 export const getAllAuditLogs = () => fetchAPI("/api/audit/logs");
 
+// Pricing (AnyWay commercialization)
+export const getPricingEstimate = (data: {
+  content_type?: string;
+  duration_days?: number;
+  regions?: string;
+  exclusivity?: boolean;
+  talent_min_price?: number;
+}) => fetchAPI("/api/pricing/estimate", { method: "POST", body: JSON.stringify(data) });
+
+// SDG Impact (FLock bounty)
+export const getSDGImpact = () => fetchAPI("/api/sdg/impact");
+
+// Agent Decisions (Animoca bounty)
+export const getAgentDecisions = () => fetchAPI("/api/agents/decisions");
+
 // Health
 export const getHealth = () => fetchAPI("/api/health");
