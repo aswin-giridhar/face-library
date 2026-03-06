@@ -1,3 +1,15 @@
+/**
+ * Claw Console — Real-time audit log viewer for all agent activity.
+ *
+ * Features:
+ * - Stats: Total Steps, Active Agents, LLM Calls, Total Tokens
+ * - Searchable, filterable log list (by agent name, action, talent/brand)
+ * - Expandable log entries showing details and license context
+ * - Agent badge coloring per agent type (Compliance, Negotiator, etc.)
+ *
+ * Data source: GET /api/audit/logs (latest 200 entries)
+ * Accessible at: /claw-console (linked from DashboardNav and /agents)
+ */
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -10,14 +22,19 @@ import {
 import DashboardNav from "@/components/DashboardNav";
 import { getAllAuditLogs } from "@/lib/api";
 
+// Agent metadata for badge display in log entries — maps agent_name (DB key) to display label, icon, color
 const AGENT_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  compliance:   { label: "Compliance",   icon: <Shield className="h-4 w-4" />,      color: "bg-blue-500/10 text-blue-700" },
-  negotiator:   { label: "Negotiator",   icon: <DollarSign className="h-4 w-4" />,  color: "bg-emerald-500/10 text-emerald-700" },
-  contract:     { label: "Contract",     icon: <Key className="h-4 w-4" />,         color: "bg-amber-500/10 text-amber-700" },
-  search:       { label: "Search",       icon: <Eye className="h-4 w-4" />,         color: "bg-purple-500/10 text-purple-700" },
-  orchestrator: { label: "Orchestrator", icon: <ScrollText className="h-4 w-4" />,  color: "bg-cyan-500/10 text-cyan-700" },
-  audit:        { label: "Audit",        icon: <FileText className="h-4 w-4" />,    color: "bg-gray-500/10 text-gray-700" },
-  talent:       { label: "Talent",       icon: <Fingerprint className="h-4 w-4" />, color: "bg-rose-500/10 text-rose-700" },
+  compliance:       { label: "Compliance & Risk",       icon: <Shield className="h-4 w-4" />,      color: "bg-blue-500/10 text-blue-700" },
+  negotiator:       { label: "Pricing Negotiator",      icon: <DollarSign className="h-4 w-4" />,  color: "bg-emerald-500/10 text-emerald-700" },
+  contract:         { label: "IP Contract",             icon: <Key className="h-4 w-4" />,         color: "bg-amber-500/10 text-amber-700" },
+  license:          { label: "License Token",           icon: <Key className="h-4 w-4" />,         color: "bg-amber-500/10 text-amber-700" },
+  gen_orchestrator: { label: "Avatar Generation",       icon: <Eye className="h-4 w-4" />,         color: "bg-purple-500/10 text-purple-700" },
+  fingerprint:      { label: "Likeness Fingerprint",    icon: <Fingerprint className="h-4 w-4" />, color: "bg-rose-500/10 text-rose-700" },
+  web3_contract:    { label: "Web3 Rights",             icon: <ScrollText className="h-4 w-4" />,  color: "bg-indigo-500/10 text-indigo-700" },
+  search:           { label: "Talent Discovery",        icon: <Eye className="h-4 w-4" />,         color: "bg-purple-500/10 text-purple-700" },
+  orchestrator:     { label: "Pipeline Orchestrator",   icon: <ScrollText className="h-4 w-4" />,  color: "bg-cyan-500/10 text-cyan-700" },
+  audit:            { label: "Audit & Logging",         icon: <FileText className="h-4 w-4" />,    color: "bg-gray-500/10 text-gray-700" },
+  talent:           { label: "Talent",                  icon: <Fingerprint className="h-4 w-4" />, color: "bg-rose-500/10 text-rose-700" },
 };
 
 interface LicenseContext {
@@ -39,7 +56,7 @@ interface AuditLogEntry {
   created_at: string;
 }
 
-const ALL_AGENTS = ["all", "compliance", "negotiator", "contract", "search", "orchestrator", "audit", "talent"];
+const ALL_AGENTS = ["all", "compliance", "negotiator", "contract", "license", "gen_orchestrator", "fingerprint", "web3_contract", "search", "orchestrator", "audit", "talent"];
 
 export default function ClawConsolePage() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);

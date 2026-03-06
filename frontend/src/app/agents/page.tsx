@@ -1,3 +1,17 @@
+/**
+ * Agent Orchestration Dashboard — Shows all 9 AI agents and their status.
+ *
+ * Displays:
+ * - System stats: Total Actions, Tokens Used, Active Agents, Licenses Processed
+ * - Agent grid: 9 cards with name, role, SDG badges, models used, per-agent stats
+ * - Model Registry: All configured LLM models with availability status
+ * - Pipeline Architecture: ASCII diagram of the 7-step licensing pipeline
+ *
+ * Agents: Compliance, Negotiator, Contract, Gen Orchestrator, Fingerprint,
+ *         Web3 Contract, Search, Audit, Orchestrator
+ *
+ * Accessible at: /agents (public)
+ */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -47,22 +61,30 @@ interface ModelInfo {
   available: boolean;
 }
 
+// Icon mapping for each agent card on the orchestration dashboard
 const AGENT_ICONS: Record<string, React.ElementType> = {
   "Compliance & Risk Agent": AlertTriangle,
-  "Negotiator Agent": Handshake,
-  "IP Contract Generation Agent": ScrollText,
-  "Audit & Traceability Agent": ClipboardCheck,
-  "Talent Search Agent": Search,
-  "Orchestrator": Workflow,
+  "Pricing Negotiator Agent": Handshake,
+  "IP Contract Agent": ScrollText,
+  "Avatar Generation Agent": Cpu,
+  "Likeness Fingerprint Agent": ClipboardCheck,
+  "Web3 Rights Agent": Globe,
+  "Talent Discovery Agent": Search,
+  "Audit & Logging Agent": ClipboardCheck,
+  "Pipeline Orchestrator": Workflow,
 };
 
+// Color mapping for agent card icons
 const AGENT_COLORS: Record<string, string> = {
   "Compliance & Risk Agent": "#B45309",
-  "Negotiator Agent": "#1E3A5F",
-  "IP Contract Generation Agent": "#0F766E",
-  "Audit & Traceability Agent": "#6B21A8",
-  "Talent Search Agent": "#0369A1",
-  "Orchestrator": "#0B0B0F",
+  "Pricing Negotiator Agent": "#1E3A5F",
+  "IP Contract Agent": "#0F766E",
+  "Avatar Generation Agent": "#7C3AED",
+  "Likeness Fingerprint Agent": "#E11D48",
+  "Web3 Rights Agent": "#0891B2",
+  "Talent Discovery Agent": "#0369A1",
+  "Audit & Logging Agent": "#6B21A8",
+  "Pipeline Orchestrator": "#0B0B0F",
 };
 
 const SDG_COLORS: Record<string, string> = {
@@ -89,13 +111,16 @@ export default function AgentDashboardPage() {
       .catch(() => {
         setAgents([
           { name: "Compliance & Risk Agent", id: "compliance", role: "Risk assessment & policy enforcement", provider: "FLock (DeepSeek) + Z.AI (GLM)", models: ["deepseek-v3.2", "glm-4-plus"], sdg: ["SDG 10", "SDG 16"] },
-          { name: "Negotiator Agent", id: "negotiator", role: "Dynamic pricing & licensing terms", provider: "FLock (Qwen3 235B)", models: ["qwen3-235b-a22b-instruct-2507"], sdg: ["SDG 8", "SDG 10"] },
-          { name: "IP Contract Generation Agent", id: "contract", role: "UK-law-compliant IP contract generation", provider: "Z.AI (GLM-4 Plus)", models: ["glm-4-plus"], sdg: ["SDG 16"] },
-          { name: "Talent Search Agent", id: "search", role: "AI-driven talent discovery", provider: "FLock (DeepSeek)", models: ["deepseek-v3.2"], sdg: ["SDG 8", "SDG 10"] },
-          { name: "Audit & Traceability Agent", id: "audit", role: "Transaction logging & usage monitoring", provider: "Local", models: [], sdg: ["SDG 16"] },
-          { name: "Orchestrator", id: "orchestrator", role: "Multi-agent pipeline coordination", provider: "Local", models: [], sdg: ["SDG 8", "SDG 10", "SDG 16"] },
+          { name: "Pricing Negotiator Agent", id: "negotiator", role: "Dynamic pricing & licensing terms", provider: "FLock (Qwen3 235B)", models: ["qwen3-235b-a22b-instruct-2507"], sdg: ["SDG 8", "SDG 10"] },
+          { name: "IP Contract Agent", id: "contract", role: "UK-law-compliant IP contract generation", provider: "Z.AI (GLM-4 Plus)", models: ["glm-4-plus"], sdg: ["SDG 16"] },
+          { name: "Avatar Generation Agent", id: "gen_orchestrator", role: "Avatar prompt generation for Z.AI", provider: "FLock (DeepSeek V3.2)", models: ["deepseek-v3.2"], sdg: ["SDG 8"] },
+          { name: "Likeness Fingerprint Agent", id: "fingerprint", role: "Unauthorized use detection & scanning", provider: "FLock (DeepSeek V3.2)", models: ["deepseek-v3.2"], sdg: ["SDG 16"] },
+          { name: "Web3 Rights Agent", id: "web3_contract", role: "Blockchain IP rights (ERC-721, Polygon)", provider: "Local (Animoca)", models: [], sdg: ["SDG 16"] },
+          { name: "Talent Discovery Agent", id: "search", role: "AI-driven talent discovery", provider: "FLock (DeepSeek)", models: ["deepseek-v3.2"], sdg: ["SDG 8", "SDG 10"] },
+          { name: "Audit & Logging Agent", id: "audit", role: "Transaction logging & usage monitoring", provider: "Local", models: [], sdg: ["SDG 16"] },
+          { name: "Pipeline Orchestrator", id: "orchestrator", role: "7-agent pipeline coordination", provider: "Local", models: [], sdg: ["SDG 8", "SDG 10", "SDG 16"] },
         ]);
-        setStats({ total_actions: 0, total_tokens_used: 0, unique_agents_active: 6, licenses_processed: 0 });
+        setStats({ total_actions: 0, total_tokens_used: 0, unique_agents_active: 9, licenses_processed: 0 });
       })
       .finally(() => setLoading(false));
   }, []);
@@ -132,7 +157,7 @@ export default function AgentDashboardPage() {
             Agent <span className="italic">Orchestration</span>
           </h1>
           <p className="font-body text-sm text-[#6B6B73] mt-2">
-            6 coordinated AI agents powered by FLock + Z.AI via OpenClaw
+            9 coordinated AI agents powered by FLock + Z.AI via OpenClaw
           </p>
         </div>
 
@@ -249,25 +274,28 @@ export default function AgentDashboardPage() {
             Pipeline Architecture
           </p>
           <pre className="font-mono text-xs leading-relaxed text-[#FAFAF8]/70 overflow-x-auto">
-{`  ┌─────────────────────────────────────────────────────────────┐
-  │                    OPENCLAW ORCHESTRATOR                    │
-  │                                                             │
-  │   Request ──▶ Compliance ──▶ Negotiator ──▶ Contract        │
-  │      │          Agent         Agent         Agent           │
-  │      │       DeepSeek V3.2  Qwen3 235B    GLM-4 Plus       │
-  │      │       + GLM Summary                + Qwen3 fallback  │
-  │      │            │             │             │             │
-  │      │            ▼             ▼             ▼             │
-  │      │       Risk Score    Pricing &     UK-Law IP          │
-  │      │       GDPR Check   Terms (SDG8)  Contract            │
-  │      │                                                      │
-  │      └──────── Audit Agent (logging all transactions) ──────│
-  │                                                             │
-  │   FLock.io: Qwen3 30B/235B · DeepSeek V3.2 · Kimi K2.5   │
-  │   Z.AI:    GLM-4 Plus (128K context)                        │
-  │   Tracing: Anyway SDK (OpenTelemetry)                       │
-  │   SDG:     8 (Decent Work) · 10 (Equality) · 16 (Justice) │
-  └─────────────────────────────────────────────────────────────┘`}
+{`  ┌──────────────────────────────────────────────────────────────────┐
+  │                 OPENCLAW PIPELINE ORCHESTRATOR (v2.0)            │
+  │                                                                  │
+  │   Request ──▶ 1. Compliance   ──▶ 2. Pricing     ──▶ 3. IP      │
+  │                  & Risk Agent      Negotiator        Contract    │
+  │                  DeepSeek V3.2     Qwen3 235B        GLM-4 Plus │
+  │                  + GLM Summary                     + Qwen3 fallb │
+  │                     │                 │                │         │
+  │                     ▼                 ▼                ▼         │
+  │   4. License Token ──▶ 5. Avatar       ──▶ 6. Likeness          │
+  │      (UUID issue)       Generation          Fingerprint          │
+  │                         (Z.AI prompt)       (Usage scan)         │
+  │                              │                   │               │
+  │                              ▼                   ▼               │
+  │                        7. Web3 Rights ──▶ Audit & Logging        │
+  │                        (ERC-721/Polygon)                         │
+  │                                                                  │
+  │   FLock.io: Qwen3 30B/235B · DeepSeek V3.2 · Kimi K2.5        │
+  │   Z.AI:    GLM-4 Plus (128K context)                             │
+  │   Tracing: Anyway SDK (OpenTelemetry)                            │
+  │   SDG:     8 (Decent Work) · 10 (Equality) · 16 (Justice)      │
+  └──────────────────────────────────────────────────────────────────┘`}
           </pre>
         </div>
       </div>

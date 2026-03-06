@@ -1,3 +1,13 @@
+/**
+ * Talent Library — Browse all registered talents with filtering and search.
+ *
+ * Brands use this page to discover talent for licensing. Displays a grid of
+ * talent cards with name, categories, Instagram handle, and starting price.
+ * Filters by: All, Trending, Female, Male, Blonde, Brunette, Influencer, Actor.
+ * Falls back to placeholder demo data when no real talents exist.
+ *
+ * Accessible at: /talent/library (public, linked from nav for all authenticated users)
+ */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,6 +24,9 @@ interface Talent {
   min_price_per_use: number;
   allow_video_generation: boolean;
   allow_image_generation: boolean;
+  instagram: string | null;
+  tiktok: string | null;
+  youtube: string | null;
 }
 
 const filterButtons = [
@@ -140,6 +153,12 @@ export default function TalentLibraryPage() {
               </div>
               <h3 className="font-body text-[15px] font-semibold text-[#0B0B0F]">{t.name}</h3>
               <p className="font-body text-[13px] text-[#6B6B73]">{t.categories || "Talent"}</p>
+              {t.instagram && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Instagram className="w-3 h-3 text-[#9B9BA3]" />
+                  <span className="font-body text-[12px] text-[#9B9BA3]">@{t.instagram}</span>
+                </div>
+              )}
               <p className="font-body text-[12px] text-[#9B9BA3] mt-0.5">From £{t.min_price_per_use}/use</p>
             </Link>
           ))}

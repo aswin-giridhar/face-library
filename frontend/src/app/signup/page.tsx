@@ -34,11 +34,14 @@ export default function SignupPage() {
         password,
         name,
         role,
-        company_name: role === "brand" ? companyName : undefined,
+        // Pass company_name for both brand (company) and agent (agency name)
+        company_name: (role === "brand" || role === "agent") ? companyName : undefined,
       });
       setUser(res);
-      if (res.role === "talent") router.push("/talent/dashboard");
-      else if (res.role === "brand") router.push("/brand/dashboard");
+      // Route each role to their onboarding flow after signup
+      if (res.role === "talent") router.push("/onboarding/chat");
+      else if (res.role === "brand") router.push("/brand/onboarding");
+      else if (res.role === "agent") router.push("/agent/onboarding");
       else router.push("/");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Signup failed");
@@ -127,15 +130,18 @@ export default function SignupPage() {
             />
           </div>
 
-          {role === "brand" && (
+          {/* Show company/agency name field for brand and agent roles */}
+          {(role === "brand" || role === "agent") && (
             <div>
-              <label className="block font-body text-sm font-medium text-[#0B0B0F] mb-1">Company Name</label>
+              <label className="block font-body text-sm font-medium text-[#0B0B0F] mb-1">
+                {role === "agent" ? "Agency Name" : "Company Name"}
+              </label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="w-full px-4 py-2.5 border border-[#E0E0DA] rounded-md font-body text-sm focus:outline-none focus:border-[#1E3A5F] bg-white"
-                placeholder="Your company"
+                placeholder={role === "agent" ? "Your agency" : "Your company"}
               />
             </div>
           )}

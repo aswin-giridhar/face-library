@@ -22,8 +22,10 @@ export default function LoginPage() {
     try {
       const res = await login({ email, password });
       setUser(res);
+      // Route each role to their dedicated dashboard after login
       if (res.role === "talent") router.push("/talent/dashboard");
       else if (res.role === "brand") router.push("/brand/dashboard");
+      else if (res.role === "agent") router.push("/agent/dashboard");
       else router.push("/");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");

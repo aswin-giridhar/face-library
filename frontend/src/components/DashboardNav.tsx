@@ -38,6 +38,14 @@ export default function DashboardNav() {
                 Dashboard
               </Link>
             )}
+            {user.role === "agent" && user.profile_id && (
+              <Link href="/agent/dashboard" className="font-body text-xs text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
+                Dashboard
+              </Link>
+            )}
+            <Link href="/talent/library" className="font-body text-xs text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
+              Library
+            </Link>
             <Link href="/claw-console" className="flex items-center gap-1 font-body text-xs text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
               <Terminal className="h-3 w-3" />
               Console

@@ -1,3 +1,14 @@
+/**
+ * Brand Dashboard — License request management for advertisers.
+ *
+ * Features:
+ * - Create new license requests (select talent, describe campaign)
+ * - Trigger 7-agent pipeline processing on pending requests
+ * - View all outgoing requests with status, proposed price, risk score
+ * - Expandable request details (negotiation notes, compliance notes, contract)
+ *
+ * Accessible at: /brand/dashboard (requires brand role)
+ */
 "use client";
 
 import { useState, useEffect } from "react";

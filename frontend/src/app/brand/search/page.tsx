@@ -1,9 +1,21 @@
+/**
+ * Brand Talent Search — AI-powered talent discovery for advertisers.
+ *
+ * Features:
+ * - Browse all registered talents with basic info
+ * - AI-powered search using the Talent Discovery Agent (FLock DeepSeek V3.2)
+ * - Quick license request creation → triggers 7-agent pipeline
+ * - Results show match score and match reasons from AI ranking
+ *
+ * Accessible at: /brand/search (linked from brand dashboard and talent library)
+ */
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Search, ArrowRight, Users } from "lucide-react";
 import { listTalents, searchTalent, createLicenseRequest, processLicense } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 interface Talent {
   id: number;
@@ -16,6 +28,7 @@ interface Talent {
 }
 
 export default function BrandSearchPage() {
+  const { user } = useAuth();
   const [talents, setTalents] = useState<Talent[]>([]);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -43,9 +56,9 @@ export default function BrandSearchPage() {
   const handleLicenseRequest = async (talentId: number) => {
     setProcessing(talentId);
     try {
-      // Create license request (using brand_id=1 as demo)
+      // Create license request using authenticated brand's profile_id
       const license = await createLicenseRequest({
-        brand_id: 1,
+        brand_id: user?.profile_id || 1,
         talent_id: talentId,
         use_case: query || "AI-generated marketing campaign",
         campaign_description: "Digital advertising campaign using AI-generated likeness",

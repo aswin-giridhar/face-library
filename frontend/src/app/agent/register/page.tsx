@@ -1,3 +1,9 @@
+/**
+ * Agent Registration — Quick signup form for talent agencies.
+ *
+ * Collects: Full Name, Company Email, Agency Name, Website (optional).
+ * On success: Creates user + agent profile, redirects to /agent/onboarding.
+ */
 "use client";
 
 import { useState } from "react";
@@ -39,7 +45,7 @@ export default function AgentRegisterPage() {
         email: form.email,
         name: form.name,
         role: "agent",
-        profile_id: null,
+        profile_id: res.profile_id || null,
       });
       setStatus("success");
       setTimeout(() => router.push("/agent/onboarding"), 1500);

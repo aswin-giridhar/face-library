@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Send, Lock, Sparkles, Upload, FileText, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { onboardingChat } from "@/lib/api";
@@ -21,6 +22,7 @@ const steps = [
 
 export default function BrandOnboardingPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -105,7 +107,9 @@ export default function BrandOnboardingPage() {
         },
       ]);
     } else if (value === "browse") {
-      window.location.href = "/talent/library";
+      router.push("/talent/library");
+    } else if (value === "dashboard") {
+      router.push("/brand/dashboard");
     }
   };
 
@@ -141,6 +145,7 @@ export default function BrandOnboardingPage() {
           content: "Would you like to browse the talent library now?",
           actions: [
             { label: "Browse Talent Library", icon: "describe", value: "browse" },
+            { label: "Go to Dashboard", icon: "describe", value: "dashboard" },
           ],
         },
       ]);

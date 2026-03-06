@@ -1,3 +1,10 @@
+/**
+ * Landing Page — Face Library platform homepage.
+ *
+ * Sections: Hero, Features (IP Protection, Smart Contracts, Real-time Monitoring),
+ * "How It Works" (3-step flow for talent), CTA for Talent/Brand/Agent registration.
+ * Links to: /talent/register, /brand/search, /agent/register, /agents, /login.
+ */
 "use client";
 
 import Image from "next/image";
@@ -25,7 +32,11 @@ import {
   Droplets,
   FileCheck,
   Brain,
+  Cpu,
+  Fingerprint,
+  Globe,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 /* ── FL Monogram SVG ──────────────────────────────────── */
 function FLMonogram({ className = "", size = 64 }: { className?: string; size?: number }) {
@@ -189,9 +200,20 @@ function AgentCard({
 
 /* ── Page ──────────────────────────────────────────────── */
 export default function HomePage() {
+  const { user } = useAuth();
+
+  // Role-specific dashboard path
+  const dashboardPath = user?.role === "talent"
+    ? "/talent/dashboard"
+    : user?.role === "brand"
+    ? "/brand/dashboard"
+    : user?.role === "agent"
+    ? "/agent/dashboard"
+    : "/";
+
   return (
     <div className="min-h-screen bg-[#FAFAF8] relative noise-bg">
-      {/* ─── Navigation ─── */}
+      {/* ─── Navigation (auth-aware: shows dashboard links when logged in) ─── */}
       <nav className="relative z-10 flex items-center justify-between px-8 lg:px-16 h-20 border-b border-[#E0E0DA] bg-white">
         <Link href="/" className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#0B0B0F]">
@@ -207,17 +229,34 @@ export default function HomePage() {
           </div>
         </Link>
         <div className="hidden lg:flex items-center gap-6">
+          {user && (
+            <Link href={dashboardPath} className="font-body text-sm text-[#1E3A5F] font-medium hover:text-[#0B0B0F] transition-colors">
+              Dashboard
+            </Link>
+          )}
+          <Link href="/talent/library" className="font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">Library</Link>
           <Link href="#features" className="font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">Features</Link>
           <Link href="#how-it-works" className="font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">How It Works</Link>
-          <Link href="#agents" className="font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">Agents</Link>
+          <Link href="/agents" className="font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">Agents</Link>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/login" className="font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
-            Sign In
-          </Link>
-          <Link href="/signup" className="hidden sm:inline-flex font-body text-sm font-medium text-[#FAFAF8] bg-[#0B0B0F] px-5 py-2 rounded-full hover:bg-[#0B0B0F]/90 transition-colors">
-            Get Started
-          </Link>
+          {!user ? (
+            <>
+              <Link href="/login" className="font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
+                Sign In
+              </Link>
+              <Link href="/signup" className="hidden sm:inline-flex font-body text-sm font-medium text-[#FAFAF8] bg-[#0B0B0F] px-5 py-2 rounded-full hover:bg-[#0B0B0F]/90 transition-colors">
+                Get Started
+              </Link>
+            </>
+          ) : (
+            <>
+              <span className="font-body text-sm text-[#6B6B73]">{user.name}</span>
+              <Link href={dashboardPath} className="hidden sm:inline-flex font-body text-sm font-medium text-[#FAFAF8] bg-[#0B0B0F] px-5 py-2 rounded-full hover:bg-[#0B0B0F]/90 transition-colors">
+                Go to Dashboard
+              </Link>
+            </>
+          )}
           <Link href="/claw-console" className="font-body text-sm font-medium text-[#0B0B0F] border border-[#0B0B0F] px-5 py-2 rounded-full hover:bg-[#0B0B0F] hover:text-[#FAFAF8] transition-all duration-300">
             Console
           </Link>
@@ -425,7 +464,7 @@ export default function HomePage() {
               Powered by OpenClaw
             </p>
             <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-light text-[#0B0B0F] leading-tight">
-              Six autonomous agents
+              Nine autonomous agents
               <br />
               <span className="italic">working in concert</span>
             </h2>
@@ -433,39 +472,57 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             <AgentCard
+              icon={AlertTriangle}
+              name="Compliance & Risk"
+              role="Scans requests for content risks, GDPR compliance, and ethical concerns."
+              provider="DeepSeek V3 + GLM-4"
+            />
+            <AgentCard
               icon={Handshake}
-              name="Negotiator"
+              name="Pricing Negotiator"
               role="Proposes dynamic pricing and licensing terms on behalf of talent."
               provider="Qwen3 235B"
             />
             <AgentCard
-              icon={AlertTriangle}
-              name="Compliance"
-              role="Scans requests for content risks, GDPR compliance, and ethical concerns."
-              provider="DeepSeek V3"
-            />
-            <AgentCard
               icon={ScrollText}
-              name="Contract"
+              name="IP Contract"
               role="Generates UK-law-compliant IP licensing contracts automatically."
               provider="GLM-4 Plus"
             />
             <AgentCard
-              icon={ClipboardCheck}
-              name="Audit"
-              role="Logs every transaction and monitors usage patterns across the platform."
-              provider="Local"
+              icon={Cpu}
+              name="Avatar Generation"
+              role="Generates image/avatar prompts for Z.AI content creation."
+              provider="DeepSeek V3"
+            />
+            <AgentCard
+              icon={Fingerprint}
+              name="Likeness Fingerprint"
+              role="Detects unauthorized use and generates scan reports across platforms."
+              provider="DeepSeek V3"
+            />
+            <AgentCard
+              icon={Globe}
+              name="Web3 Rights"
+              role="Generates blockchain contract metadata for on-chain IP rights (ERC-721)."
+              provider="Polygon"
             />
             <AgentCard
               icon={Search}
-              name="Search"
+              name="Talent Discovery"
               role="AI-driven talent discovery matching brand requirements to creator profiles."
               provider="DeepSeek V3"
             />
             <AgentCard
+              icon={ClipboardCheck}
+              name="Audit & Logging"
+              role="Logs every transaction and monitors usage patterns across the platform."
+              provider="Local"
+            />
+            <AgentCard
               icon={Workflow}
-              name="Orchestrator"
-              role="Coordinates all agents through the licensing pipeline end-to-end."
+              name="Pipeline Orchestrator"
+              role="Coordinates all 7 pipeline agents through the licensing flow end-to-end."
               provider="Pipeline"
             />
           </div>
@@ -486,8 +543,8 @@ export default function HomePage() {
                 <p className="font-body text-xs tracking-[0.2em] uppercase text-[#FAFAF8]/60">Compliant Contracts</p>
               </div>
               <div>
-                <p className="font-display text-4xl lg:text-5xl font-light italic mb-2">6 Agents</p>
-                <p className="font-body text-xs tracking-[0.2em] uppercase text-[#FAFAF8]/60">Autonomous Pipeline</p>
+                <p className="font-display text-4xl lg:text-5xl font-light italic mb-2">9 Agents</p>
+                <p className="font-body text-xs tracking-[0.2em] uppercase text-[#FAFAF8]/60">7-Step Pipeline</p>
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 """Face Library -- Secure Likeness Licensing Infrastructure API.
 
-Multi-agent platform for AI likeness licensing with full pipeline orchestration.
+Multi-agent platform for AI likeness licensing with full 7-agent pipeline orchestration.
 
 Bounty coverage:
 - FLock.io: All LLM inference via FLock API (Qwen3, DeepSeek, Kimi)
@@ -11,8 +11,10 @@ Bounty coverage:
 """
 import os
 import sys
+import json
 import hashlib
 import secrets
+import uuid
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -24,12 +26,11 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-# Add backend to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
 from models import (
-    init_db, get_db, User, TalentProfile, BrandProfile,
-    LicenseRequest, Contract, AuditLog, LicenseStatus,
+    init_db, get_db, User, TalentProfile, BrandProfile, AgentProfile,
+    TalentAgentLink, LicenseRequest, Contract, AuditLog, LicenseStatus,
 )
 from agents.orchestrator import OrchestratorAgent
 from llm_client import chat as llm_chat, chat_json as llm_chat_json, get_model_info
@@ -46,8 +47,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Face Library API",
-    description="Secure Likeness Licensing Infrastructure -- Multi-Agent Platform",
-    version="1.0.0",
+    description="Secure Likeness Licensing Infrastructure -- 7-Agent Pipeline",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -76,6 +77,11 @@ class TalentRegisterRequest(BaseModel):
     allow_image_generation: bool = True
     geo_restrictions: str | None = None
     portfolio_description: str | None = None
+    instagram: str | None = None
+    tiktok: str | None = None
+    youtube: str | None = None
+    has_agent: bool = False
+    agent_email: str | None = None
 
 
 class BrandRegisterRequest(BaseModel):
@@ -85,6 +91,17 @@ class BrandRegisterRequest(BaseModel):
     industry: str | None = None
     website: str | None = None
     description: str | None = None
+
+
+class AgentRegisterRequest(BaseModel):
+    email: str
+    name: str
+    agency_name: str
+    website: str | None = None
+    country: str | None = None
+    team_size: str | None = None
+    default_restricted_categories: str | None = None
+    approval_workflow: str = "both_required"
 
 
 class LicenseRequestCreate(BaseModel):
@@ -114,7 +131,7 @@ class SignupRequest(BaseModel):
     email: str
     password: str
     name: str
-    role: str  # talent | brand | agent
+    role: str
     company_name: str | None = None
 
 
@@ -133,6 +150,11 @@ class TalentPreferencesUpdate(BaseModel):
     allow_ai_training: bool | None = None
     allow_video_generation: bool | None = None
     allow_image_generation: bool | None = None
+    instagram: str | None = None
+    tiktok: str | None = None
+    youtube: str | None = None
+    has_agent: bool | None = None
+    agent_email: str | None = None
 
 
 class PricingEstimateRequest(BaseModel):
@@ -144,13 +166,19 @@ class PricingEstimateRequest(BaseModel):
 
 
 class OnboardingChatRequest(BaseModel):
-    messages: list[dict]  # [{role: "user"/"assistant", content: "..."}]
-    user_type: str = "talent"  # talent | brand | agent
-    context: dict | None = None  # Extra context (user name, company, etc.)
+    messages: list[dict]
+    user_type: str = "talent"
+    context: dict | None = None
 
 
 class PhotoAnalyzeRequest(BaseModel):
-    description: str = ""  # Text description if no image analysis available
+    description: str = ""
+
+
+class TalentAgentLinkRequest(BaseModel):
+    talent_id: int
+    agent_id: int
+    approval_type: str = "both_required"
 
 
 # -- Auth helpers --------------------------------------------------------------
@@ -176,6 +204,9 @@ def _get_profile_id(user: User, db: Session) -> int | None:
     elif user.role == "brand":
         bp = db.query(BrandProfile).filter(BrandProfile.user_id == user.id).first()
         return bp.id if bp else None
+    elif user.role == "agent":
+        ap = db.query(AgentProfile).filter(AgentProfile.user_id == user.id).first()
+        return ap.id if ap else None
     return None
 
 
@@ -191,32 +222,31 @@ def _user_response(user: User, profile_id: int | None) -> dict:
 
 def _sync_supabase_user(supabase_uid: str, email: str, name: str, role: str,
                          company_name: str | None, db: Session) -> User:
-    """Find or create a local User record linked to a Supabase Auth user."""
     user = db.query(User).filter(User.supabase_uid == supabase_uid).first()
     if user:
         return user
-    # Also check by email (migrating from legacy auth)
     user = db.query(User).filter(User.email == email).first()
     if user:
         user.supabase_uid = supabase_uid
         db.commit()
         return user
-    # Create new local user
     user = User(email=email, name=name, role=role, supabase_uid=supabase_uid)
     db.add(user)
     db.flush()
-    # Auto-create profile
     if role == "talent":
         profile = TalentProfile(user_id=user.id)
         db.add(profile)
     elif role == "brand":
         profile = BrandProfile(user_id=user.id, company_name=company_name or name)
         db.add(profile)
+    elif role == "agent":
+        profile = AgentProfile(user_id=user.id, agency_name=company_name or name)
+        db.add(profile)
     db.commit()
     return user
 
 
-# -- Auth Endpoints (Supabase with local fallback) ----------------------------
+# -- Auth Endpoints -----------------------------------------------------------
 
 
 @app.post("/api/auth/signup")
@@ -224,7 +254,6 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
     if req.role not in ("talent", "brand", "agent"):
         raise HTTPException(400, "Role must be talent, brand, or agent")
 
-    # Try Supabase auth first
     if supabase:
         try:
             auth_res = supabase.auth.sign_up({
@@ -252,12 +281,10 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
         except HTTPException:
             raise
         except Exception as e:
-            # If Supabase fails, fall through to local auth
             error_msg = str(e)
             if "already registered" in error_msg.lower() or "already been registered" in error_msg.lower():
                 raise HTTPException(400, "Email already registered")
 
-    # Fallback: local auth
     existing = db.query(User).filter(User.email == req.email).first()
     if existing:
         raise HTTPException(400, "Email already registered")
@@ -285,6 +312,14 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
         db.add(profile)
         db.flush()
         profile_id = profile.id
+    elif req.role == "agent":
+        profile = AgentProfile(
+            user_id=user.id,
+            agency_name=req.company_name or req.name,
+        )
+        db.add(profile)
+        db.flush()
+        profile_id = profile.id
 
     db.commit()
     return {**_user_response(user, profile_id), "access_token": None, "auth_provider": "local"}
@@ -292,7 +327,6 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
-    # Try Supabase auth first
     if supabase:
         try:
             auth_res = supabase.auth.sign_in_with_password({
@@ -304,7 +338,6 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
                 name = meta.get("name", req.email.split("@")[0])
                 role = meta.get("role", "talent")
                 company = meta.get("company_name")
-
                 user = _sync_supabase_user(auth_res.user.id, req.email, name, role, company, db)
                 return {
                     **_user_response(user, _get_profile_id(user, db)),
@@ -312,9 +345,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
                     "auth_provider": "supabase",
                 }
         except Exception:
-            pass  # Fall through to local auth
+            pass
 
-    # Fallback: local auth
     user = db.query(User).filter(User.email == req.email).first()
     if not user:
         raise HTTPException(401, "Invalid email or password")
@@ -362,6 +394,11 @@ def register_talent(req: TalentRegisterRequest, db: Session = Depends(get_db)):
         allow_image_generation=req.allow_image_generation,
         geo_restrictions=req.geo_restrictions,
         portfolio_description=req.portfolio_description,
+        instagram=req.instagram,
+        tiktok=req.tiktok,
+        youtube=req.youtube,
+        has_agent=req.has_agent,
+        agent_email=req.agent_email,
     )
     db.add(profile)
     db.commit()
@@ -376,6 +413,21 @@ def get_talent(talent_id: int, db: Session = Depends(get_db)):
     if not profile:
         raise HTTPException(404, "Talent not found")
     user = db.query(User).filter(User.id == profile.user_id).first()
+
+    # Get linked agent
+    link = db.query(TalentAgentLink).filter(TalentAgentLink.talent_id == talent_id).first()
+    agent_info = None
+    if link:
+        agent = db.query(AgentProfile).filter(AgentProfile.id == link.agent_id).first()
+        agent_user = db.query(User).filter(User.id == agent.user_id).first() if agent else None
+        if agent:
+            agent_info = {
+                "id": agent.id,
+                "agency_name": agent.agency_name,
+                "name": agent_user.name if agent_user else "",
+                "approval_type": link.approval_type,
+            }
+
     return {
         "id": profile.id,
         "name": user.name,
@@ -392,6 +444,12 @@ def get_talent(talent_id: int, db: Session = Depends(get_db)):
         "geo_scope": profile.geo_scope,
         "approval_mode": profile.approval_mode,
         "portfolio_description": profile.portfolio_description,
+        "instagram": profile.instagram,
+        "tiktok": profile.tiktok,
+        "youtube": profile.youtube,
+        "has_agent": profile.has_agent,
+        "agent_email": profile.agent_email,
+        "linked_agent": agent_info,
     }
 
 
@@ -409,12 +467,12 @@ def list_talents(db: Session = Depends(get_db)):
             "approval_mode": tp.approval_mode,
             "allow_video_generation": tp.allow_video_generation,
             "allow_image_generation": tp.allow_image_generation,
+            "instagram": tp.instagram,
+            "tiktok": tp.tiktok,
+            "youtube": tp.youtube,
         }
         for tp, u in talents
     ]
-
-
-# -- Talent Dashboard Endpoints ------------------------------------------------
 
 
 @app.put("/api/talent/{talent_id}/preferences")
@@ -450,6 +508,7 @@ def get_talent_requests(talent_id: int, db: Session = Depends(get_db)):
             "desired_regions": lr.desired_regions,
             "proposed_price": lr.proposed_price,
             "risk_score": lr.risk_score,
+            "license_token": lr.license_token,
             "created_at": lr.created_at.isoformat(),
         })
     return results
@@ -498,9 +557,6 @@ def get_brand(brand_id: int, db: Session = Depends(get_db)):
     }
 
 
-# -- Brand Dashboard Endpoints -------------------------------------------------
-
-
 @app.get("/api/brand/{brand_id}/requests")
 def get_brand_requests(brand_id: int, db: Session = Depends(get_db)):
     requests = (
@@ -527,8 +583,171 @@ def get_brand_requests(brand_id: int, db: Session = Depends(get_db)):
             "risk_score": lr.risk_score,
             "negotiation_notes": lr.negotiation_notes,
             "compliance_notes": lr.compliance_notes,
+            "license_token": lr.license_token,
+            "orchestration_status": lr.orchestration_status,
             "has_contract": contract is not None,
             "created_at": lr.created_at.isoformat(),
+        })
+    return results
+
+
+# -- Agent Profile Endpoints ---------------------------------------------------
+
+
+@app.post("/api/agent/register")
+def register_agent(req: AgentRegisterRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == req.email).first()
+    if existing:
+        raise HTTPException(400, "Email already registered")
+
+    user = User(email=req.email, name=req.name, role="agent")
+    db.add(user)
+    db.flush()
+
+    profile = AgentProfile(
+        user_id=user.id,
+        agency_name=req.agency_name,
+        website=req.website,
+        country=req.country,
+        team_size=req.team_size,
+        default_restricted_categories=req.default_restricted_categories,
+        approval_workflow=req.approval_workflow,
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+
+    return {"id": profile.id, "user_id": user.id, "agency": req.agency_name, "message": "Agent registered successfully"}
+
+
+@app.get("/api/agent/{agent_id}")
+def get_agent(agent_id: int, db: Session = Depends(get_db)):
+    profile = db.query(AgentProfile).filter(AgentProfile.id == agent_id).first()
+    if not profile:
+        raise HTTPException(404, "Agent not found")
+    user = db.query(User).filter(User.id == profile.user_id).first()
+
+    # Get managed talents
+    links = db.query(TalentAgentLink).filter(TalentAgentLink.agent_id == agent_id).all()
+    managed_talents = []
+    for link in links:
+        talent = db.query(TalentProfile).filter(TalentProfile.id == link.talent_id).first()
+        talent_user = db.query(User).filter(User.id == talent.user_id).first() if talent else None
+        if talent and talent_user:
+            managed_talents.append({
+                "id": talent.id,
+                "name": talent_user.name,
+                "geo_scope": talent.geo_scope,
+                "approval_type": link.approval_type,
+                "categories": talent.categories,
+            })
+
+    return {
+        "id": profile.id,
+        "name": user.name,
+        "email": user.email,
+        "agency_name": profile.agency_name,
+        "website": profile.website,
+        "country": profile.country,
+        "team_size": profile.team_size,
+        "default_restricted_categories": profile.default_restricted_categories,
+        "approval_workflow": profile.approval_workflow,
+        "managed_talents": managed_talents,
+    }
+
+
+@app.get("/api/agent/{agent_id}/requests")
+def get_agent_requests(agent_id: int, db: Session = Depends(get_db)):
+    """Get license requests for all talents managed by this agent."""
+    links = db.query(TalentAgentLink).filter(TalentAgentLink.agent_id == agent_id).all()
+    talent_ids = [link.talent_id for link in links]
+    if not talent_ids:
+        return []
+
+    requests = (
+        db.query(LicenseRequest)
+        .filter(LicenseRequest.talent_id.in_(talent_ids))
+        .order_by(LicenseRequest.created_at.desc())
+        .all()
+    )
+    results = []
+    for lr in requests:
+        talent = db.query(TalentProfile).filter(TalentProfile.id == lr.talent_id).first()
+        talent_user = db.query(User).filter(User.id == talent.user_id).first() if talent else None
+        brand = db.query(BrandProfile).filter(BrandProfile.id == lr.brand_id).first()
+        results.append({
+            "id": lr.id,
+            "status": lr.status,
+            "talent_name": talent_user.name if talent_user else "Unknown",
+            "brand_name": brand.company_name if brand else "Unknown",
+            "use_case": lr.use_case,
+            "content_type": lr.content_type,
+            "desired_duration_days": lr.desired_duration_days,
+            "proposed_price": lr.proposed_price,
+            "created_at": lr.created_at.isoformat(),
+        })
+    return results
+
+
+# -- Talent-Agent Linking ------------------------------------------------------
+
+
+@app.post("/api/talent-agent/link")
+def link_talent_agent(req: TalentAgentLinkRequest, db: Session = Depends(get_db)):
+    talent = db.query(TalentProfile).filter(TalentProfile.id == req.talent_id).first()
+    if not talent:
+        raise HTTPException(404, "Talent not found")
+    agent = db.query(AgentProfile).filter(AgentProfile.id == req.agent_id).first()
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+
+    existing = db.query(TalentAgentLink).filter(
+        TalentAgentLink.talent_id == req.talent_id,
+        TalentAgentLink.agent_id == req.agent_id,
+    ).first()
+    if existing:
+        raise HTTPException(400, "Link already exists")
+
+    link = TalentAgentLink(
+        talent_id=req.talent_id,
+        agent_id=req.agent_id,
+        approval_type=req.approval_type,
+    )
+    db.add(link)
+    talent.has_agent = True
+    db.commit()
+    db.refresh(link)
+
+    return {"id": link.id, "talent_id": req.talent_id, "agent_id": req.agent_id, "message": "Linked successfully"}
+
+
+@app.delete("/api/talent-agent/link/{link_id}")
+def unlink_talent_agent(link_id: int, db: Session = Depends(get_db)):
+    link = db.query(TalentAgentLink).filter(TalentAgentLink.id == link_id).first()
+    if not link:
+        raise HTTPException(404, "Link not found")
+    talent = db.query(TalentProfile).filter(TalentProfile.id == link.talent_id).first()
+    db.delete(link)
+    remaining = db.query(TalentAgentLink).filter(TalentAgentLink.talent_id == link.talent_id).count()
+    if talent and remaining == 0:
+        talent.has_agent = False
+    db.commit()
+    return {"message": "Unlinked successfully"}
+
+
+@app.get("/api/talent-agent/links/{agent_id}")
+def get_agent_links(agent_id: int, db: Session = Depends(get_db)):
+    links = db.query(TalentAgentLink).filter(TalentAgentLink.agent_id == agent_id).all()
+    results = []
+    for link in links:
+        talent = db.query(TalentProfile).filter(TalentProfile.id == link.talent_id).first()
+        talent_user = db.query(User).filter(User.id == talent.user_id).first() if talent else None
+        results.append({
+            "id": link.id,
+            "talent_id": link.talent_id,
+            "talent_name": talent_user.name if talent_user else "Unknown",
+            "approval_type": link.approval_type,
+            "geo_scope": talent.geo_scope if talent else "global",
         })
     return results
 
@@ -565,7 +784,7 @@ def create_license_request(req: LicenseRequestCreate, db: Session = Depends(get_
 
 @app.post("/api/licensing/{license_id}/process")
 def process_license(license_id: int, db: Session = Depends(get_db)):
-    """Trigger the multi-agent pipeline to process a license request."""
+    """Trigger the 7-agent pipeline to process a license request."""
     license_req = db.query(LicenseRequest).filter(LicenseRequest.id == license_id).first()
     if not license_req:
         raise HTTPException(404, "License request not found")
@@ -605,6 +824,7 @@ def process_license(license_id: int, db: Session = Depends(get_db)):
     }
 
     license_req.status = LicenseStatus.NEGOTIATING.value
+    license_req.orchestration_status = "in_progress"
     db.commit()
 
     result = orchestrator.process_license_request(talent_profile, brand_profile, license_data)
@@ -634,13 +854,29 @@ def process_license(license_id: int, db: Session = Depends(get_db)):
             )
             db.add(contract)
 
+        if stage["stage"] == "license_token" and stage["result"].get("license_token"):
+            license_req.license_token = stage["result"]["license_token"]
+
+        if stage["stage"] == "gen_orchestrator" and stage.get("status") == "complete":
+            gen_prompt = stage["result"].get("details", {}).get("generated_prompt", "")
+            license_req.gen_prompt = gen_prompt
+
+        if stage["stage"] == "fingerprint" and stage.get("status") == "complete":
+            fp_id = stage["result"].get("details", {}).get("fingerprint_id", "")
+            license_req.fingerprint_id = fp_id
+
+        if stage["stage"] == "web3_contract" and stage.get("status") == "complete":
+            license_req.web3_contract = json.dumps(stage["result"].get("details", {}))
+
     license_req.status = result.get("final_status", LicenseStatus.AWAITING_APPROVAL.value)
+    license_req.orchestration_status = "completed" if result["final_status"] != "rejected_compliance" else "failed"
     license_req.updated_at = datetime.utcnow()
     db.commit()
 
     return {
         "license_id": license_id,
         "status": license_req.status,
+        "orchestration_status": license_req.orchestration_status,
         "pipeline_result": result,
     }
 
@@ -654,7 +890,6 @@ def get_license(license_id: int, db: Session = Depends(get_db)):
     talent = db.query(TalentProfile).filter(TalentProfile.id == lr.talent_id).first()
     talent_user = db.query(User).filter(User.id == talent.user_id).first()
     brand = db.query(BrandProfile).filter(BrandProfile.id == lr.brand_id).first()
-
     contract = db.query(Contract).filter(Contract.license_id == lr.id).first()
 
     return {
@@ -673,6 +908,11 @@ def get_license(license_id: int, db: Session = Depends(get_db)):
         "risk_details": lr.risk_details,
         "negotiation_notes": lr.negotiation_notes,
         "compliance_notes": lr.compliance_notes,
+        "license_token": lr.license_token,
+        "orchestration_status": lr.orchestration_status,
+        "fingerprint_id": lr.fingerprint_id,
+        "gen_prompt": lr.gen_prompt,
+        "web3_contract": lr.web3_contract,
         "contract": {
             "id": contract.id,
             "text": contract.contract_text,
@@ -692,6 +932,8 @@ def approve_license(license_id: int, approval: LicenseApproval, db: Session = De
 
     if approval.approved:
         lr.status = LicenseStatus.ACTIVE.value
+        if not lr.license_token:
+            lr.license_token = str(uuid.uuid4())
     else:
         lr.status = LicenseStatus.REJECTED.value
 
@@ -722,6 +964,8 @@ def list_licenses(db: Session = Depends(get_db)):
             "use_case": lr.use_case,
             "proposed_price": lr.proposed_price,
             "risk_score": lr.risk_score,
+            "license_token": lr.license_token,
+            "orchestration_status": lr.orchestration_status,
             "created_at": lr.created_at.isoformat(),
         })
     return results
@@ -739,28 +983,18 @@ def search_talent(req: SearchRequest):
         filters["max_price"] = req.max_price
     if req.region:
         filters["region"] = req.region
-
     result = orchestrator.search_talent(req.query, filters)
     return result
 
 
-# -- Pricing API (AnyWay commercialization bounty) -----------------------------
+# -- Pricing API ---------------------------------------------------------------
 
 
 @app.post("/api/pricing/estimate")
 def pricing_estimate(req: PricingEstimateRequest):
-    """Quick pricing estimate without running the full agent pipeline.
-
-    This endpoint supports the AnyWay bounty commercialization requirement
-    by providing a self-service pricing tool that brands can use.
-    """
     base_rate = max(req.talent_min_price, 100.0)
-
-    # Content type multiplier
     content_factors = {"image": 1.0, "video": 2.5, "both": 3.0}
     content_mult = content_factors.get(req.content_type, 1.0)
-
-    # Duration multiplier (per-day rate decreases for longer terms)
     if req.duration_days <= 7:
         duration_mult = 1.0
     elif req.duration_days <= 30:
@@ -771,8 +1005,6 @@ def pricing_estimate(req: PricingEstimateRequest):
         duration_mult = 0.4
     else:
         duration_mult = 0.3
-
-    # Region multiplier
     region_lower = req.regions.lower()
     if "global" in region_lower:
         region_mult = 3.0
@@ -780,15 +1012,11 @@ def pricing_estimate(req: PricingEstimateRequest):
         region_mult = 2.0
     else:
         region_mult = 1.0
-
-    # Exclusivity premium
     exclusivity_mult = 2.5 if req.exclusivity else 1.0
-
     estimated_price = round(
         base_rate * content_mult * (req.duration_days * duration_mult) * region_mult * exclusivity_mult / 30,
         2,
     )
-
     return {
         "estimated_price": estimated_price,
         "currency": "GBP",
@@ -809,18 +1037,11 @@ def pricing_estimate(req: PricingEstimateRequest):
     }
 
 
-# -- SDG Impact Endpoint (FLock bounty) ---------------------------------------
+# -- SDG Impact Endpoint -------------------------------------------------------
 
 
 @app.get("/api/sdg/impact")
 def sdg_impact(db: Session = Depends(get_db)):
-    """SDG impact metrics for the FLock.io bounty track.
-
-    Tracks alignment with:
-    - SDG 8: Decent Work and Economic Growth
-    - SDG 10: Reduced Inequalities
-    - SDG 16: Peace, Justice and Strong Institutions
-    """
     total_talents = db.query(TalentProfile).count()
     total_brands = db.query(BrandProfile).count()
     total_licenses = db.query(LicenseRequest).count()
@@ -831,7 +1052,6 @@ def sdg_impact(db: Session = Depends(get_db)):
         LicenseRequest.status.in_(["rejected", "rejected_compliance"])
     ).count()
 
-    # Calculate average compensation
     from sqlalchemy import func
     avg_price = db.query(func.avg(LicenseRequest.proposed_price)).filter(
         LicenseRequest.proposed_price.isnot(None)
@@ -884,61 +1104,21 @@ def sdg_impact(db: Session = Depends(get_db)):
 
 @app.get("/api/agents/status")
 def agents_status():
-    """Get status of all agents in the system with model info."""
     stats = orchestrator.audit.get_system_stats()
     agent_stats = orchestrator.audit.get_agent_stats()
     models = get_model_info()
 
     return {
         "agents": [
-            {
-                "name": "Compliance Agent",
-                "id": "compliance",
-                "role": "Risk assessment & policy enforcement",
-                "provider": "FLock (DeepSeek V3.2) + Z.AI (GLM-4 Plus)",
-                "models": ["deepseek-v3.2", "glm-4-plus"],
-                "sdg": ["SDG 10", "SDG 16"],
-            },
-            {
-                "name": "Negotiator Agent",
-                "id": "negotiator",
-                "role": "Dynamic pricing & licensing terms",
-                "provider": "FLock (Qwen3 235B)",
-                "models": ["qwen3-235b-a22b-instruct-2507"],
-                "sdg": ["SDG 8", "SDG 10"],
-            },
-            {
-                "name": "Contract Agent",
-                "id": "contract",
-                "role": "UK-law-compliant IP contract generation",
-                "provider": "Z.AI (GLM-4 Plus) / FLock (Qwen3 235B)",
-                "models": ["glm-4-plus", "qwen3-235b-a22b-thinking-2507"],
-                "sdg": ["SDG 16"],
-            },
-            {
-                "name": "Search Agent",
-                "id": "search",
-                "role": "AI-driven talent discovery",
-                "provider": "FLock (DeepSeek V3.2)",
-                "models": ["deepseek-v3.2"],
-                "sdg": ["SDG 8", "SDG 10"],
-            },
-            {
-                "name": "Audit Agent",
-                "id": "audit",
-                "role": "Transaction logging & usage monitoring",
-                "provider": "Local (SQLite)",
-                "models": [],
-                "sdg": ["SDG 16"],
-            },
-            {
-                "name": "Orchestrator",
-                "id": "orchestrator",
-                "role": "Multi-agent pipeline coordination",
-                "provider": "Local",
-                "models": [],
-                "sdg": ["SDG 8", "SDG 10", "SDG 16"],
-            },
+            {"name": "Compliance & Risk Agent", "id": "compliance", "role": "Risk assessment & policy enforcement", "provider": "FLock (DeepSeek V3.2) + Z.AI (GLM-4 Plus)", "models": ["deepseek-v3.2", "glm-4-plus"], "sdg": ["SDG 10", "SDG 16"]},
+            {"name": "Pricing Negotiator Agent", "id": "negotiator", "role": "Dynamic pricing & licensing terms", "provider": "FLock (Qwen3 235B)", "models": ["qwen3-235b-a22b-instruct-2507"], "sdg": ["SDG 8", "SDG 10"]},
+            {"name": "IP Contract Agent", "id": "contract", "role": "UK-law-compliant IP contract generation", "provider": "Z.AI (GLM-4 Plus) / FLock (Qwen3 235B)", "models": ["glm-4-plus", "qwen3-235b-a22b-thinking-2507"], "sdg": ["SDG 16"]},
+            {"name": "Avatar Generation Agent", "id": "gen_orchestrator", "role": "Avatar prompt generation for Z.AI", "provider": "FLock (DeepSeek V3.2)", "models": ["deepseek-v3.2"], "sdg": ["SDG 8"]},
+            {"name": "Likeness Fingerprint Agent", "id": "fingerprint", "role": "Unauthorized use detection & scanning", "provider": "FLock (DeepSeek V3.2)", "models": ["deepseek-v3.2"], "sdg": ["SDG 16"]},
+            {"name": "Web3 Rights Agent", "id": "web3_contract", "role": "Blockchain IP rights (ERC-721)", "provider": "Local (Animoca Integration)", "models": [], "sdg": ["SDG 16"]},
+            {"name": "Talent Discovery Agent", "id": "search", "role": "AI-driven talent discovery", "provider": "FLock (DeepSeek V3.2)", "models": ["deepseek-v3.2"], "sdg": ["SDG 8", "SDG 10"]},
+            {"name": "Audit & Logging Agent", "id": "audit", "role": "Transaction logging & usage monitoring", "provider": "Local (SQLite)", "models": [], "sdg": ["SDG 16"]},
+            {"name": "Pipeline Orchestrator", "id": "orchestrator", "role": "7-agent pipeline coordination", "provider": "Local", "models": [], "sdg": ["SDG 8", "SDG 10", "SDG 16"]},
         ],
         "stats": stats,
         "agent_stats": agent_stats,
@@ -948,7 +1128,6 @@ def agents_status():
 
 @app.get("/api/agents/decisions")
 def agent_decisions():
-    """Get recent agent decisions -- Animoca bounty (agent memory/identity)."""
     decisions = orchestrator.audit.get_decision_history(limit=50)
     return {"decisions": decisions, "total": len(decisions)}
 
@@ -991,7 +1170,7 @@ def get_audit_trail(license_id: int):
     return {"license_id": license_id, "audit_trail": trail}
 
 
-# -- Onboarding Chat Endpoints (AI-powered) -----------------------------------
+# -- Onboarding Chat Endpoints ------------------------------------------------
 
 
 ONBOARDING_SYSTEM_PROMPTS = {
@@ -999,7 +1178,9 @@ ONBOARDING_SYSTEM_PROMPTS = {
         "You are the Face Library onboarding assistant for talent/creators. "
         "You help them set up their profile so brands can license their likeness safely. "
         "You are warm, professional, and concise. Guide them through: age, location, "
-        "photo upload, profile description review, and terms acceptance. "
+        "photo upload, profile description review, social media connection, "
+        "ad category restrictions (Alcohol, Smoking, Gambling, Adult, Political, Fur, Lingerie), "
+        "agency representation check, and terms acceptance. "
         "Keep responses short (1-3 sentences). Use a friendly tone. "
         "When they provide their age/location, acknowledge it and move to the next step. "
         "If they ask questions about the platform, briefly explain that Face Library "
@@ -1008,8 +1189,11 @@ ONBOARDING_SYSTEM_PROMPTS = {
     "brand": (
         "You are the Face Library onboarding assistant for advertisers/brands. "
         "You help them set up campaigns and find the perfect talent for AI-generated ads. "
-        "Guide them through: welcome, campaign brief (upload or describe), talent search "
-        "preferences, and license request setup. "
+        "Guide them through: welcome, campaign brief (upload or describe), "
+        "geographic scope (UK/EU/Global), license duration, "
+        "channels (organic social, paid social, website, TV, OOH, print), "
+        "talent search preferences (age, look, vibe), "
+        "and license request setup. "
         "Be professional but approachable. Keep responses short (1-3 sentences). "
         "Ask about their campaign goals, target audience, content type (image/video), "
         "budget range, and preferred talent characteristics."
@@ -1018,7 +1202,10 @@ ONBOARDING_SYSTEM_PROMPTS = {
         "You are the Face Library onboarding assistant for talent agencies. "
         "You help them set up their agency profile and manage talent onboarding. "
         "Guide them through: agency info (name, website, country), team size, "
-        "talent onboarding approach, content restrictions, and license workflow setup. "
+        "talent onboarding approach, default content restrictions "
+        "(Alcohol, Smoking, Gambling, Adult, Political, Fur, Lingerie), "
+        "contract template upload, and approval workflow setup "
+        "(talent_only, agent_only, both_required). "
         "Be professional and efficient. Keep responses short (1-3 sentences). "
         "Help them understand how Face Library protects their talent roster."
     ),
@@ -1027,11 +1214,6 @@ ONBOARDING_SYSTEM_PROMPTS = {
 
 @app.post("/api/chat/onboarding")
 def onboarding_chat(req: OnboardingChatRequest):
-    """AI-powered onboarding chat using FLock LLM.
-
-    Sends conversation history to the LLM with a role-specific system prompt
-    to generate contextual responses for talent, brand, or agent onboarding.
-    """
     system_prompt = ONBOARDING_SYSTEM_PROMPTS.get(req.user_type, ONBOARDING_SYSTEM_PROMPTS["talent"])
 
     if req.context:
@@ -1040,8 +1222,7 @@ def onboarding_chat(req: OnboardingChatRequest):
             system_prompt += f"\n\nUser context: {context_str}"
 
     messages = [{"role": "system", "content": system_prompt}]
-
-    for msg in req.messages[-10:]:  # Keep last 10 messages for context window
+    for msg in req.messages[-10:]:
         role = msg.get("role", "user")
         if role in ("bot", "assistant"):
             role = "assistant"
@@ -1064,11 +1245,6 @@ def onboarding_chat(req: OnboardingChatRequest):
 
 @app.post("/api/talent/analyze-photo")
 def analyze_photo(req: PhotoAnalyzeRequest):
-    """Generate an AI profile description for a talent based on their self-description.
-
-    Uses FLock LLM to create structured profile attributes (hair, eyes, style, vibe)
-    from the user's text description or generates plausible defaults.
-    """
     prompt = (
         "Generate a concise profile description for a talent/model on a likeness licensing platform. "
         "Return ONLY valid JSON with exactly these 4 fields: hair, eyes, style, vibe. "
@@ -1077,7 +1253,7 @@ def analyze_photo(req: PhotoAnalyzeRequest):
     if req.description:
         prompt += f'The person describes themselves as: "{req.description}". '
     else:
-        prompt += "No description provided — generate plausible, diverse defaults. "
+        prompt += "No description provided -- generate plausible, diverse defaults. "
 
     prompt += 'Example: {"hair": "Blonde", "eyes": "Blue", "style": "Natural", "vibe": "Friendly"}'
 
@@ -1111,8 +1287,9 @@ def health():
     return {
         "status": "healthy",
         "service": "Face Library API",
-        "version": "1.0.0",
-        "agents": 6,
+        "version": "2.0.0",
+        "agents": 9,
+        "pipeline": "7-step (Compliance -> Negotiator -> Contract -> Gen -> Fingerprint -> Web3 -> Audit)",
         "providers": ["FLock (Qwen3, DeepSeek, Kimi)", "Z.AI (GLM-4 Plus)"],
         "bounties": ["FLock.io", "Z.AI", "Claw for Human", "AnyWay", "Animoca"],
         "tracing": "Anyway SDK (OpenTelemetry)",

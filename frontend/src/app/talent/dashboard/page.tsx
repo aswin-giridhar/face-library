@@ -1,3 +1,15 @@
+/**
+ * Talent Dashboard — Manage likeness licensing preferences and incoming requests.
+ *
+ * Features:
+ * - Profile card (name, email, geo scope)
+ * - Approval settings (auto/manual toggle, geographic scope)
+ * - Linked agent display (agency name, contact, approval type)
+ * - Ad category permissions (15 categories, click to toggle: allowed/blocked/neutral)
+ * - Incoming license requests with approve/reject/view actions
+ *
+ * Accessible at: /talent/dashboard (requires talent role)
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -190,7 +202,19 @@ export default function TalentDashboardPage() {
             <h3 className="font-body text-sm font-medium text-[#0B0B0F] flex items-center gap-2 mb-4">
               <Shield className="h-4 w-4" /> Linked Agent
             </h3>
-            <p className="font-body text-sm text-[#6B6B73]">No agent linked yet.</p>
+            {(profile as Record<string, unknown>)?.linked_agent ? (
+              <div className="space-y-2 font-body text-sm">
+                <div><span className="text-[#6B6B73]">Agency:</span> <span className="font-medium">{((profile as Record<string, unknown>).linked_agent as Record<string, unknown>)?.agency_name as string}</span></div>
+                <div><span className="text-[#6B6B73]">Contact:</span> <span>{((profile as Record<string, unknown>).linked_agent as Record<string, unknown>)?.name as string}</span></div>
+                <div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#F5F5F0] text-[#6B6B73] capitalize">
+                    {(((profile as Record<string, unknown>).linked_agent as Record<string, unknown>)?.approval_type as string || "both_required").replace(/_/g, " ")}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="font-body text-sm text-[#6B6B73]">No agent linked yet.</p>
+            )}
           </div>
         </div>
 

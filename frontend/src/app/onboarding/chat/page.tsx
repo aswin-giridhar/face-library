@@ -1,19 +1,39 @@
+/**
+ * Talent Onboarding Chat — Conversational profile setup flow.
+ *
+ * 8-step guided flow:
+ *   Step 0: Age selection (quick-pick buttons or freetext)
+ *   Step 1: Location (freetext)
+ *   Step 2: Photo upload → AI-generated profile description
+ *   Step 3: Review/edit AI description
+ *   Step 4: Connect social media (Instagram, TikTok, YouTube)
+ *   Step 5: Select restricted ad categories (Alcohol, Gambling, etc.)
+ *   Step 6: Agency representation check (yes/no)
+ *   Step 7: Agency email (if represented)
+ *   Step 8: Terms review & agree → redirect to Talent Library
+ *
+ * AI responses powered by FLock DeepSeek V3.2 via /api/chat/onboarding.
+ */
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Camera, Sparkles, Edit3, Check, Loader2 } from "lucide-react";
+import { ArrowRight, Camera, Sparkles, Edit3, Check, Loader2, Instagram, Youtube, Music2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { onboardingChat, analyzePhoto } from "@/lib/api";
 
 interface Message {
   role: "bot" | "user";
   content: string;
-  type?: "text" | "photo-preview" | "ai-description" | "terms";
+  type?: "text" | "photo-preview" | "ai-description" | "terms" | "social-media" | "restrictions" | "agency-check";
   photoUrl?: string;
   description?: { hair: string; eyes: string; style: string; vibe: string };
 }
+
+const RESTRICTION_CATEGORIES = [
+  "Alcohol", "Smoking", "Gambling", "Adult", "Political", "Fur", "Lingerie", "Other",
+];
 
 export default function FaceLibraryChatPage() {
   const router = useRouter();
@@ -23,6 +43,10 @@ export default function FaceLibraryChatPage() {
   const [step, setStep] = useState(0);
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedRestrictions, setSelectedRestrictions] = useState<string[]>([]);
+  const [socialLinks, setSocialLinks] = useState({ instagram: "", tiktok: "", youtube: "" });
+  const [hasAgent, setHasAgent] = useState<boolean | null>(null);
+  const [agentEmail, setAgentEmail] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -92,7 +116,20 @@ export default function FaceLibraryChatPage() {
         },
       ]);
       setStep(2);
-    } else if (step === 4) {
+    } else if (step === 7) {
+      // Agency email provided
+      setAgentEmail(userMsg);
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", content: "Got it! We'll notify your agency. Now let's review the terms." },
+        {
+          role: "bot",
+          content: "Before we generate your digital avatar, please review:",
+          type: "terms",
+        },
+      ]);
+      setStep(8);
+    } else if (step === 8) {
       const aiReply = await getAIResponse(updatedMessages);
       setMessages((prev) => [
         ...prev,
@@ -128,10 +165,6 @@ export default function FaceLibraryChatPage() {
     setMessages((prev) => [
       ...prev,
       { role: "user", content: "Uploaded a photo", type: "photo-preview", photoUrl: url },
-    ]);
-
-    setMessages((prev) => [
-      ...prev,
       { role: "bot", content: "Analyzing your photo with AI..." },
     ]);
     setLoading(true);
@@ -175,8 +208,8 @@ export default function FaceLibraryChatPage() {
           ...prev,
           {
             role: "bot",
-            content: "Before we generate your digital avatar, please review:",
-            type: "terms",
+            content: "Would you like to connect your social media accounts? This helps brands discover you.",
+            type: "social-media",
           },
         ]);
         setStep(4);
@@ -194,6 +227,71 @@ export default function FaceLibraryChatPage() {
         ...prev,
         { role: "bot", content: aiReply || "No problem! Type your corrections below and I'll update your profile." },
       ]);
+    }
+  };
+
+  const handleSocialSubmit = () => {
+    const parts = [];
+    if (socialLinks.instagram) parts.push(`Instagram: @${socialLinks.instagram}`);
+    if (socialLinks.tiktok) parts.push(`TikTok: @${socialLinks.tiktok}`);
+    if (socialLinks.youtube) parts.push(`YouTube: ${socialLinks.youtube}`);
+    const msg = parts.length > 0 ? `Connected: ${parts.join(", ")}` : "Skipped social media";
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: msg },
+      {
+        role: "bot",
+        content: "Now, are there any ad categories you'd like to restrict? Select all that apply.",
+        type: "restrictions",
+      },
+    ]);
+    setStep(5);
+  };
+
+  const toggleRestriction = (cat: string) => {
+    setSelectedRestrictions((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const handleRestrictionsSubmit = () => {
+    const msg = selectedRestrictions.length > 0
+      ? `Restricted: ${selectedRestrictions.join(", ")}`
+      : "No restrictions set";
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: msg },
+      {
+        role: "bot",
+        content: "Are you currently represented by a talent agency?",
+        type: "agency-check",
+      },
+    ]);
+    setStep(6);
+  };
+
+  const handleAgencyResponse = (represented: boolean) => {
+    setHasAgent(represented);
+    if (represented) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: "Yes, I have an agency." },
+        { role: "bot", content: "What's your agency's email address? We'll loop them in." },
+      ]);
+      setStep(7);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: "No, I'm independent." },
+        {
+          role: "bot",
+          content: "Before we generate your digital avatar, please review:",
+          type: "terms",
+        },
+      ]);
+      setStep(8);
     }
   };
 
@@ -277,6 +375,101 @@ export default function FaceLibraryChatPage() {
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                         Edit
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {msg.type === "social-media" && (
+                  <div className="bg-[#F4F4F8] rounded-2xl rounded-bl-md p-5">
+                    <p className="font-body text-[14px] text-[#0B0B0F] mb-4">{msg.content}</p>
+                    <div className="space-y-3 mb-4">
+                      <div className="flex items-center gap-3 bg-white rounded-xl border border-[#E8E8EC] px-4 py-3">
+                        <Instagram className="w-4 h-4 text-pink-500" />
+                        <input
+                          type="text"
+                          value={socialLinks.instagram}
+                          onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+                          placeholder="Instagram username"
+                          className="flex-1 font-body text-[13px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 bg-white rounded-xl border border-[#E8E8EC] px-4 py-3">
+                        <Music2 className="w-4 h-4 text-[#0B0B0F]" />
+                        <input
+                          type="text"
+                          value={socialLinks.tiktok}
+                          onChange={(e) => setSocialLinks({ ...socialLinks, tiktok: e.target.value })}
+                          placeholder="TikTok username"
+                          className="flex-1 font-body text-[13px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 bg-white rounded-xl border border-[#E8E8EC] px-4 py-3">
+                        <Youtube className="w-4 h-4 text-red-500" />
+                        <input
+                          type="text"
+                          value={socialLinks.youtube}
+                          onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })}
+                          placeholder="YouTube channel"
+                          className="flex-1 font-body text-[13px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSocialSubmit}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#4F6AF6] to-[#6C8AFF] text-white font-body text-[13px] font-semibold py-2.5 rounded-xl hover:shadow-lg hover:shadow-[#4F6AF6]/25 transition-all"
+                      >
+                        {socialLinks.instagram || socialLinks.tiktok || socialLinks.youtube ? "Connect & Continue" : "Skip"}
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {msg.type === "restrictions" && (
+                  <div className="bg-[#F4F4F8] rounded-2xl rounded-bl-md p-5">
+                    <p className="font-body text-[14px] text-[#0B0B0F] mb-4">{msg.content}</p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {RESTRICTION_CATEGORIES.map((cat) => (
+                        <button
+                          key={cat}
+                          onClick={() => toggleRestriction(cat)}
+                          className={`px-4 py-2 rounded-xl border font-body text-[13px] transition-all ${
+                            selectedRestrictions.includes(cat)
+                              ? "border-red-400 bg-red-50 text-red-700"
+                              : "border-[#E8E8EC] bg-white text-[#0B0B0F] hover:border-[#4F6AF6]"
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={handleRestrictionsSubmit}
+                      className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#4F6AF6] to-[#6C8AFF] text-white font-body text-[13px] font-semibold py-2.5 rounded-xl hover:shadow-lg hover:shadow-[#4F6AF6]/25 transition-all"
+                    >
+                      {selectedRestrictions.length > 0 ? `Block ${selectedRestrictions.length} categories` : "No restrictions"}
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {msg.type === "agency-check" && (
+                  <div className="bg-[#F4F4F8] rounded-2xl rounded-bl-md p-5">
+                    <p className="font-body text-[14px] text-[#0B0B0F] mb-4">{msg.content}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAgencyResponse(true)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 border border-[#E8E8EC] bg-white text-[#0B0B0F] font-body text-[13px] font-medium py-2.5 rounded-xl hover:border-[#4F6AF6] hover:bg-[#4F6AF6]/5 transition-all"
+                      >
+                        Yes, I have an agency
+                      </button>
+                      <button
+                        onClick={() => handleAgencyResponse(false)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 border border-[#E8E8EC] bg-white text-[#0B0B0F] font-body text-[13px] font-medium py-2.5 rounded-xl hover:border-[#4F6AF6] hover:bg-[#4F6AF6]/5 transition-all"
+                      >
+                        No, I&apos;m independent
                       </button>
                     </div>
                   </div>
@@ -372,6 +565,8 @@ export default function FaceLibraryChatPage() {
                 ? "Or type your age..."
                 : step === 2
                 ? "Or describe yourself instead..."
+                : step === 7
+                ? "Enter your agency's email..."
                 : "Type your message..."
             }
             className="flex-1 bg-[#F8F8FA] border border-[#E8E8EC] rounded-xl px-4 py-3 font-body text-[14px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none focus:ring-2 focus:ring-[#4F6AF6]/20 focus:border-[#4F6AF6] transition-all disabled:opacity-50"

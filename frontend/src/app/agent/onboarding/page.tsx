@@ -1,8 +1,22 @@
+/**
+ * Agent Onboarding — Guided setup flow for talent agencies.
+ *
+ * 6-step flow:
+ *   1. Welcome — Introduce Face Library to the agency
+ *   2. Agency Info — Name, website, country, team size
+ *   3. Talent Profiles — How many talents they manage
+ *   4. Restrictions — Default restricted ad categories for all talent
+ *   5. Approval Workflow — talent_only / agent_only / both_required
+ *   6. Complete — Redirect to agent dashboard
+ *
+ * AI responses powered by FLock DeepSeek V3.2 via /api/chat/onboarding.
+ */
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Send, Lock, Sparkles, Check, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Send, Lock, Sparkles, Check, Loader2, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { onboardingChat } from "@/lib/api";
 
@@ -10,6 +24,7 @@ interface Message {
   role: "assistant" | "user";
   content: string;
   options?: { label: string; value: string }[];
+  type?: "text" | "restrictions" | "approval-workflow";
 }
 
 const steps = [
@@ -17,15 +32,22 @@ const steps = [
   { label: "Agency Info", key: "agency" },
   { label: "Talent Profiles", key: "talent" },
   { label: "Restrictions", key: "restrictions" },
-  { label: "License Request", key: "license" },
+  { label: "Approval Workflow", key: "workflow" },
+  { label: "Complete", key: "complete" },
+];
+
+const RESTRICTION_CATEGORIES = [
+  "Alcohol", "Smoking", "Gambling", "Adult", "Political", "Fur", "Lingerie", "Other",
 ];
 
 export default function AgentOnboardingPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedRestrictions, setSelectedRestrictions] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [initialized, setInitialized] = useState(false);
 
@@ -86,6 +108,55 @@ export default function AgentOnboardingPage() {
     await advanceConversation(updated);
   };
 
+  const toggleRestriction = (cat: string) => {
+    setSelectedRestrictions((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const handleRestrictionsSubmit = async () => {
+    const msg = selectedRestrictions.length > 0
+      ? `Default restrictions: ${selectedRestrictions.join(", ")}`
+      : "No default restrictions";
+
+    const userMsg: Message = { role: "user", content: msg };
+    const updated = [...messages, userMsg];
+    setMessages(updated);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: "How should approval work for your talents' license requests?",
+        type: "approval-workflow",
+      },
+    ]);
+    setCurrentStep(4);
+  };
+
+  const handleWorkflowSelect = async (workflow: string) => {
+    const labels: Record<string, string> = {
+      talent_only: "Talent approves directly",
+      agent_only: "Agency approves on behalf",
+      both_required: "Both talent and agency must approve",
+    };
+    const userMsg: Message = { role: "user", content: labels[workflow] || workflow };
+    const updated = [...messages, userMsg];
+    setMessages(updated);
+
+    const aiReply = await getAIResponse(updated);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: aiReply || "Your agency profile is all set up! Redirecting you to your dashboard...",
+      },
+    ]);
+    setCurrentStep(5);
+    // Redirect to agent dashboard after completion
+    setTimeout(() => router.push("/agent/dashboard"), 2000);
+  };
+
   const advanceConversation = async (allMessages: Message[]) => {
     const aiReply = await getAIResponse(allMessages);
 
@@ -130,18 +201,17 @@ export default function AgentOnboardingPage() {
         ...prev,
         {
           role: "assistant",
-          content: aiReply || "Are there any content restrictions or categories your talents should avoid?",
+          content: aiReply || "What default content restrictions should apply to your talents? Select all that apply.",
+          type: "restrictions",
         },
       ]);
-      setCurrentStep(4);
-    } else {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: aiReply || "Your agency profile is all set up! You can now manage your talent roster and handle license requests from the dashboard.",
-        },
-      ]);
+    } else if (currentStep >= 5) {
+      if (aiReply) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: aiReply },
+        ]);
+      }
     }
   };
 
@@ -160,7 +230,7 @@ export default function AgentOnboardingPage() {
 
         <div className="p-6 flex-1">
           <p className="font-body text-xs font-semibold text-[#0B0B0F] mb-1">Onboarding</p>
-          <p className="font-body text-[11px] text-[#9B9BA3] mb-5">Step {currentStep + 1} of {steps.length}</p>
+          <p className="font-body text-[11px] text-[#9B9BA3] mb-5">Step {Math.min(currentStep + 1, steps.length)} of {steps.length}</p>
           <div className="space-y-1">
             {steps.map((step, i) => (
               <div
@@ -236,12 +306,63 @@ export default function AgentOnboardingPage() {
                   >
                     {msg.content}
                   </div>
+
+                  {/* Option buttons */}
                   {msg.options && (
                     <div className="flex flex-wrap gap-2 mt-3">
                       {msg.options.map((opt) => (
                         <button
                           key={opt.value}
                           onClick={() => handleOption(opt.value)}
+                          disabled={loading}
+                          className="px-4 py-2 rounded-xl border border-[#E8E8EC] bg-white font-body text-[13px] text-[#0B0B0F] hover:border-[#4F6AF6] hover:bg-[#4F6AF6]/5 transition-all disabled:opacity-50"
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Restriction selection */}
+                  {msg.type === "restrictions" && (
+                    <div className="mt-3">
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {RESTRICTION_CATEGORIES.map((cat) => (
+                          <button
+                            key={cat}
+                            onClick={() => toggleRestriction(cat)}
+                            className={`px-4 py-2 rounded-xl border font-body text-[13px] transition-all ${
+                              selectedRestrictions.includes(cat)
+                                ? "border-red-400 bg-red-50 text-red-700"
+                                : "border-[#E8E8EC] bg-white text-[#0B0B0F] hover:border-[#4F6AF6]"
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={handleRestrictionsSubmit}
+                        disabled={loading}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#4F6AF6] to-[#6C8AFF] text-white font-body text-[13px] font-medium hover:shadow-md transition-all disabled:opacity-50"
+                      >
+                        {selectedRestrictions.length > 0 ? `Set ${selectedRestrictions.length} restrictions` : "No restrictions"}
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Approval workflow selection */}
+                  {msg.type === "approval-workflow" && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {[
+                        { label: "Talent approves directly", value: "talent_only" },
+                        { label: "Agency approves on behalf", value: "agent_only" },
+                        { label: "Both must approve", value: "both_required" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => handleWorkflowSelect(opt.value)}
                           disabled={loading}
                           className="px-4 py-2 rounded-xl border border-[#E8E8EC] bg-white font-body text-[13px] text-[#0B0B0F] hover:border-[#4F6AF6] hover:bg-[#4F6AF6]/5 transition-all disabled:opacity-50"
                         >

@@ -1,3 +1,17 @@
+/**
+ * License Detail Page — Full view of a single license request and its pipeline results.
+ *
+ * Displays:
+ * - License status, talent & brand info, use case details
+ * - Risk assessment from Compliance & Risk Agent
+ * - Proposed pricing from Pricing Negotiator Agent
+ * - Full contract text from IP Contract Agent
+ * - License token, fingerprint ID, Web3 contract metadata
+ * - Audit trail timeline from all agents
+ * - Approve/reject actions (for talent reviewing the request)
+ *
+ * Accessible at: /license/[id] (linked from dashboards and request lists)
+ */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -13,6 +27,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { getLicense, approveLicense, getAuditTrail } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 interface LicenseData {
   id: number;
@@ -60,7 +75,13 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
 
 export default function LicenseDetailPage() {
   const params = useParams();
+  const { user } = useAuth();
   const id = Number(params.id);
+  // Navigate back to role-specific dashboard
+  const backPath = user?.role === "brand" ? "/brand/dashboard"
+    : user?.role === "agent" ? "/agent/dashboard"
+    : user?.role === "talent" ? "/talent/dashboard"
+    : "/";
   const [license, setLicense] = useState<LicenseData | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,9 +142,9 @@ export default function LicenseDetailPage() {
           <span className={`font-body text-xs px-3 py-1 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>
             {statusStyle.label}
           </span>
-          <Link href="/" className="flex items-center gap-2 font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
+          <Link href={backPath} className="flex items-center gap-2 font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            Back
+            Back to Dashboard
           </Link>
         </div>
       </nav>

@@ -1,3 +1,12 @@
+/**
+ * Face Library API Client — All backend calls to FastAPI.
+ *
+ * Sections: Auth, Talent, Brand, Agent, Talent-Agent Linking,
+ * Licensing (7-agent pipeline), Search, Pricing, SDG Impact,
+ * Agent Orchestration Status, Audit Logs, Onboarding Chat.
+ *
+ * Backend: FastAPI at localhost:8000 (configurable via NEXT_PUBLIC_API_URL).
+ */
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function fetchAPI(path: string, options?: RequestInit) {
@@ -42,6 +51,23 @@ export const getBrand = (id: number) => fetchAPI(`/api/brand/${id}`);
 
 export const getBrandRequests = (id: number) => fetchAPI(`/api/brand/${id}/requests`);
 
+// Agent
+export const registerAgent = (data: Record<string, unknown>) =>
+  fetchAPI("/api/agent/register", { method: "POST", body: JSON.stringify(data) });
+
+export const getAgent = (id: number) => fetchAPI(`/api/agent/${id}`);
+
+export const getAgentRequests = (id: number) => fetchAPI(`/api/agent/${id}/requests`);
+
+// Talent-Agent Linking
+export const linkTalentAgent = (data: { talent_id: number; agent_id: number; approval_type?: string }) =>
+  fetchAPI("/api/talent-agent/link", { method: "POST", body: JSON.stringify(data) });
+
+export const unlinkTalentAgent = (linkId: number) =>
+  fetchAPI(`/api/talent-agent/link/${linkId}`, { method: "DELETE" });
+
+export const getAgentLinks = (agentId: number) => fetchAPI(`/api/talent-agent/links/${agentId}`);
+
 // Licensing
 export const createLicenseRequest = (data: Record<string, unknown>) =>
   fetchAPI("/api/licensing/request", { method: "POST", body: JSON.stringify(data) });
@@ -74,7 +100,7 @@ export const getAuditTrail = (licenseId: number) =>
 
 export const getAllAuditLogs = () => fetchAPI("/api/audit/logs");
 
-// Pricing (AnyWay commercialization)
+// Pricing
 export const getPricingEstimate = (data: {
   content_type?: string;
   duration_days?: number;
@@ -83,20 +109,20 @@ export const getPricingEstimate = (data: {
   talent_min_price?: number;
 }) => fetchAPI("/api/pricing/estimate", { method: "POST", body: JSON.stringify(data) });
 
-// SDG Impact (FLock bounty)
+// SDG Impact
 export const getSDGImpact = () => fetchAPI("/api/sdg/impact");
 
-// Agent Decisions (Animoca bounty)
+// Agent Decisions
 export const getAgentDecisions = () => fetchAPI("/api/agents/decisions");
 
-// Onboarding Chat (AI-powered)
+// Onboarding Chat
 export const onboardingChat = (data: {
   messages: { role: string; content: string }[];
   user_type: string;
   context?: Record<string, string>;
 }) => fetchAPI("/api/chat/onboarding", { method: "POST", body: JSON.stringify(data) });
 
-// Photo Analysis (AI profile generation)
+// Photo Analysis
 export const analyzePhoto = (data: { description?: string }) =>
   fetchAPI("/api/talent/analyze-photo", { method: "POST", body: JSON.stringify(data) });
 
