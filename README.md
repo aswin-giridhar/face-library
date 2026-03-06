@@ -131,12 +131,14 @@ Face Library uses **all 5 FLock open-source models** as the primary LLM provider
 
 ### 2. Z.AI -- Best Use of GLM Model ($4,000 USD)
 
-Z.AI's GLM-4 Plus (128K context window) is used as a **core component** in two agents:
+Z.AI GLM models are used as a **core component** in two agents, with a resilient 3-tier fallback chain:
 
-1. **IP Contract Agent (Primary)** -- Generates full 12-section UK-law-compliant IP licensing agreements covering GDPR, Copyright Act 1988, Consumer Rights Act 2015, and dispute resolution. GLM-4 Plus's 128K context is ideal for long structured legal documents.
-2. **Compliance & Risk Agent (Summary)** -- After DeepSeek performs risk analysis, GLM-4 Plus generates concise executive summaries for talent review. This dual-model approach combines fast analysis with high-quality summarization.
+**Fallback chain:** Z.AI Direct API (GLM-4 Plus) → OpenRouter (GLM-4.5, thinking disabled) → FLock (Qwen3 235B Thinking)
 
-The `openclaw.json` gateway registers Z.AI as a dedicated provider with model binding `zai/glm-4-plus`. Contract agent falls back to FLock Qwen3 235B Thinking if Z.AI is unavailable.
+1. **IP Contract Agent (Primary)** -- Generates full 12-section UK-law-compliant IP licensing agreements covering GDPR, Copyright Act 1988, Consumer Rights Act 2015, and dispute resolution. GLM's large context window is ideal for long structured legal documents.
+2. **Compliance & Risk Agent (Summary)** -- After DeepSeek performs risk analysis, GLM generates concise executive summaries for talent review. This dual-model approach combines fast analysis with high-quality summarization.
+
+The `openclaw.json` gateway registers Z.AI as a dedicated provider. The LLM client (`llm_client.py`) automatically routes GLM requests through the best available provider, ensuring Z.AI bounty compliance regardless of direct API availability.
 
 ### 3. Claw for Human -- Most Impactful AI Agent ($500)
 
@@ -179,7 +181,7 @@ Face Library is a coordinated multi-agent system where 9 specialized AI agents c
 |-------|-----------|
 | Frontend | Next.js 16, React, TypeScript, Tailwind CSS |
 | Backend | Python, FastAPI, SQLAlchemy, SQLite |
-| LLM Providers | FLock.io (Qwen3 30B/235B, DeepSeek V3.2, Kimi K2.5), Z.AI (GLM-4 Plus 128K) |
+| LLM Providers | FLock.io (Qwen3 30B/235B, DeepSeek V3.2, Kimi K2.5), Z.AI (GLM-4 Plus / GLM-4.5 via OpenRouter) |
 | Agent Platform | OpenClaw (gateway config, 9 agent definitions, 2 providers) |
 | Observability | Anyway SDK (OpenTelemetry -- session/agent/LLM/tool spans) |
 | Tracing | `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` |

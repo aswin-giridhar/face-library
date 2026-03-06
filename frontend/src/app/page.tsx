@@ -487,7 +487,7 @@ export default function HomePage() {
               icon={ScrollText}
               name="IP Contract"
               role="Generates UK-law-compliant IP licensing contracts automatically."
-              provider="GLM-4 Plus"
+              provider="GLM-4.5 / GLM-4+"
             />
             <AgentCard
               icon={Cpu}
@@ -617,6 +617,8 @@ export default function HomePage() {
               <span className="font-semibold text-[#0B0B0F]">FLock.io</span>
               <span className="mx-1">&middot;</span>
               <span className="font-semibold text-[#0B0B0F]">Z.AI</span>
+              <span className="mx-1">&middot;</span>
+              <span className="font-semibold text-[#0B0B0F]">OpenRouter</span>
             </div>
             <div className="flex items-center gap-4">
               <Link href="/talent/library" className="font-body text-xs text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
