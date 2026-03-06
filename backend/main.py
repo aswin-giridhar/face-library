@@ -32,7 +32,7 @@ from models import (
     LicenseRequest, Contract, AuditLog, LicenseStatus,
 )
 from agents.orchestrator import OrchestratorAgent
-from llm_client import get_model_info
+from llm_client import chat as llm_chat, chat_json as llm_chat_json, get_model_info
 from supabase_client import supabase, supabase_admin
 
 orchestrator = OrchestratorAgent()
@@ -141,6 +141,16 @@ class PricingEstimateRequest(BaseModel):
     regions: str = "UK"
     exclusivity: bool = False
     talent_min_price: float = 100.0
+
+
+class OnboardingChatRequest(BaseModel):
+    messages: list[dict]  # [{role: "user"/"assistant", content: "..."}]
+    user_type: str = "talent"  # talent | brand | agent
+    context: dict | None = None  # Extra context (user name, company, etc.)
+
+
+class PhotoAnalyzeRequest(BaseModel):
+    description: str = ""  # Text description if no image analysis available
 
 
 # -- Auth helpers --------------------------------------------------------------
@@ -979,6 +989,118 @@ def get_all_audit_logs(db: Session = Depends(get_db)):
 def get_audit_trail(license_id: int):
     trail = orchestrator.audit.get_license_audit_trail(license_id)
     return {"license_id": license_id, "audit_trail": trail}
+
+
+# -- Onboarding Chat Endpoints (AI-powered) -----------------------------------
+
+
+ONBOARDING_SYSTEM_PROMPTS = {
+    "talent": (
+        "You are the Face Library onboarding assistant for talent/creators. "
+        "You help them set up their profile so brands can license their likeness safely. "
+        "You are warm, professional, and concise. Guide them through: age, location, "
+        "photo upload, profile description review, and terms acceptance. "
+        "Keep responses short (1-3 sentences). Use a friendly tone. "
+        "When they provide their age/location, acknowledge it and move to the next step. "
+        "If they ask questions about the platform, briefly explain that Face Library "
+        "protects their likeness rights and lets them earn from AI-generated content."
+    ),
+    "brand": (
+        "You are the Face Library onboarding assistant for advertisers/brands. "
+        "You help them set up campaigns and find the perfect talent for AI-generated ads. "
+        "Guide them through: welcome, campaign brief (upload or describe), talent search "
+        "preferences, and license request setup. "
+        "Be professional but approachable. Keep responses short (1-3 sentences). "
+        "Ask about their campaign goals, target audience, content type (image/video), "
+        "budget range, and preferred talent characteristics."
+    ),
+    "agent": (
+        "You are the Face Library onboarding assistant for talent agencies. "
+        "You help them set up their agency profile and manage talent onboarding. "
+        "Guide them through: agency info (name, website, country), team size, "
+        "talent onboarding approach, content restrictions, and license workflow setup. "
+        "Be professional and efficient. Keep responses short (1-3 sentences). "
+        "Help them understand how Face Library protects their talent roster."
+    ),
+}
+
+
+@app.post("/api/chat/onboarding")
+def onboarding_chat(req: OnboardingChatRequest):
+    """AI-powered onboarding chat using FLock LLM.
+
+    Sends conversation history to the LLM with a role-specific system prompt
+    to generate contextual responses for talent, brand, or agent onboarding.
+    """
+    system_prompt = ONBOARDING_SYSTEM_PROMPTS.get(req.user_type, ONBOARDING_SYSTEM_PROMPTS["talent"])
+
+    if req.context:
+        context_str = ", ".join(f"{k}: {v}" for k, v in req.context.items() if v)
+        if context_str:
+            system_prompt += f"\n\nUser context: {context_str}"
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    for msg in req.messages[-10:]:  # Keep last 10 messages for context window
+        role = msg.get("role", "user")
+        if role in ("bot", "assistant"):
+            role = "assistant"
+        messages.append({"role": role, "content": msg.get("content", "")})
+
+    result = llm_chat(
+        messages=messages,
+        model_tier="fast",
+        temperature=0.7,
+        max_tokens=256,
+        agent_name="onboarding_assistant",
+    )
+
+    return {
+        "response": result["content"],
+        "model": result["model"],
+        "provider": result["provider"],
+    }
+
+
+@app.post("/api/talent/analyze-photo")
+def analyze_photo(req: PhotoAnalyzeRequest):
+    """Generate an AI profile description for a talent based on their self-description.
+
+    Uses FLock LLM to create structured profile attributes (hair, eyes, style, vibe)
+    from the user's text description or generates plausible defaults.
+    """
+    prompt = (
+        "Generate a concise profile description for a talent/model on a likeness licensing platform. "
+        "Return ONLY valid JSON with exactly these 4 fields: hair, eyes, style, vibe. "
+        "Each value should be 1-2 words. "
+    )
+    if req.description:
+        prompt += f'The person describes themselves as: "{req.description}". '
+    else:
+        prompt += "No description provided — generate plausible, diverse defaults. "
+
+    prompt += 'Example: {"hair": "Blonde", "eyes": "Blue", "style": "Natural", "vibe": "Friendly"}'
+
+    result = llm_chat_json(
+        messages=[
+            {"role": "system", "content": "You are a profile description generator. Return only valid JSON."},
+            {"role": "user", "content": prompt},
+        ],
+        model_tier="fast",
+        temperature=0.8,
+        max_tokens=128,
+        agent_name="photo_analyzer",
+    )
+
+    description = result.get("parsed")
+    if not description:
+        description = {"hair": "Brown", "eyes": "Brown", "style": "Natural", "vibe": "Confident"}
+
+    return {
+        "description": description,
+        "model": result["model"],
+        "provider": result["provider"],
+    }
 
 
 # -- Health Check --------------------------------------------------------------

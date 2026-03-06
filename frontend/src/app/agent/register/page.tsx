@@ -4,33 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
-import { registerBrand } from "@/lib/api";
+import { signup } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
-const industries = [
-  "Fashion",
-  "Beauty",
-  "Technology",
-  "Food & Beverage",
-  "Health & Wellness",
-  "Lifestyle",
-  "Travel",
-  "Auto",
-  "Real Estate",
-  "Consumer Electronics",
-  "Entertainment",
-  "Other",
-];
-
-export default function BrandRegisterPage() {
+export default function AgentRegisterPage() {
   const router = useRouter();
   const { setUser } = useAuth();
   const [form, setForm] = useState({
     name: "",
     email: "",
-    company_name: "",
+    agency_name: "",
     website: "",
-    industry: "",
   });
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -40,29 +24,25 @@ export default function BrandRegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.industry) {
-      setErrorMsg("Please select an industry.");
-      return;
-    }
     setStatus("loading");
     setErrorMsg("");
     try {
-      const res = await registerBrand({
+      const res = await signup({
         name: form.name,
         email: form.email,
-        company_name: form.company_name,
-        industry: form.industry,
-        website: form.website,
+        password: "agent-temp-" + Date.now(),
+        role: "agent",
+        company_name: form.agency_name,
       });
       setUser({
         user_id: res.user_id || res.id,
         email: form.email,
         name: form.name,
-        role: "brand",
-        profile_id: res.id,
+        role: "agent",
+        profile_id: null,
       });
       setStatus("success");
-      setTimeout(() => router.push("/brand/onboarding"), 1500);
+      setTimeout(() => router.push("/agent/onboarding"), 1500);
     } catch {
       setStatus("error");
       setErrorMsg("Registration failed. Please try again.");
@@ -87,7 +67,6 @@ export default function BrandRegisterPage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
       <header className="flex items-center justify-center py-8">
         <Link href="/" className="flex flex-col items-center gap-1">
           <div className="flex items-center gap-2">
@@ -102,15 +81,14 @@ export default function BrandRegisterPage() {
         </Link>
       </header>
 
-      {/* Form */}
       <main className="flex-1 flex items-start justify-center px-6 pb-16">
         <div className="w-full max-w-[480px]">
           <div className="text-center mb-10">
             <h1 className="font-display text-3xl md:text-4xl font-light text-[#0B0B0F] mb-3">
-              Create Your Advertiser Profile
+              Create Your Agent Profile
             </h1>
             <p className="font-body text-[15px] text-[#6B6B73]">
-              Tell us about your brand so we can optimize your experience.
+              Tell us about your agency so we can optimize your experience.
             </p>
           </div>
 
@@ -141,9 +119,9 @@ export default function BrandRegisterPage() {
               <input
                 type="text"
                 required
-                value={form.company_name}
-                onChange={(e) => update("company_name", e.target.value)}
-                placeholder="Company Name"
+                value={form.agency_name}
+                onChange={(e) => update("agency_name", e.target.value)}
+                placeholder="Agency Name"
                 className="w-full bg-[#F8F8FA] border border-[#E8E8EC] rounded-xl px-5 py-3.5 font-body text-[15px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none focus:ring-2 focus:ring-[#4F6AF6]/30 focus:border-[#4F6AF6] transition-all"
               />
             </div>
@@ -156,35 +134,6 @@ export default function BrandRegisterPage() {
                 placeholder="Website"
                 className="w-full bg-[#F8F8FA] border border-[#E8E8EC] rounded-xl px-5 py-3.5 font-body text-[15px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none focus:ring-2 focus:ring-[#4F6AF6]/30 focus:border-[#4F6AF6] transition-all"
               />
-            </div>
-
-            {/* Industry Selection */}
-            <div className="pt-2">
-              <p className="font-body text-[13px] text-[#6B6B73] mb-1">Industry</p>
-              <p className="font-body text-[12px] text-[#9B9BA3] mb-3">Select your industry from the categories below</p>
-              <div className="grid grid-cols-2 gap-2.5">
-                {industries.map((ind) => (
-                  <label
-                    key={ind}
-                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border cursor-pointer transition-all ${
-                      form.industry === ind
-                        ? "border-[#4F6AF6] bg-[#4F6AF6]/5"
-                        : "border-[#E8E8EC] bg-[#F8F8FA] hover:border-[#D0D0D8]"
-                    }`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                        form.industry === ind ? "border-[#4F6AF6]" : "border-[#C8C8D0]"
-                      }`}
-                    >
-                      {form.industry === ind && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#4F6AF6]" />
-                      )}
-                    </div>
-                    <span className="font-body text-[13px] text-[#0B0B0F]">{ind}</span>
-                  </label>
-                ))}
-              </div>
             </div>
 
             <div className="pt-4">
@@ -205,7 +154,7 @@ export default function BrandRegisterPage() {
             <p className="font-body text-[11px] text-[#9B9BA3] text-center leading-relaxed">
               By continuing, you agree to our{" "}
               <span className="underline cursor-pointer">Terms of Service</span> and confirm
-              the information provided is accurate.
+              that the information provided is accurate.
             </p>
           </form>
         </div>

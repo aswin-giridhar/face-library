@@ -89,5 +89,16 @@ export const getSDGImpact = () => fetchAPI("/api/sdg/impact");
 // Agent Decisions (Animoca bounty)
 export const getAgentDecisions = () => fetchAPI("/api/agents/decisions");
 
+// Onboarding Chat (AI-powered)
+export const onboardingChat = (data: {
+  messages: { role: string; content: string }[];
+  user_type: string;
+  context?: Record<string, string>;
+}) => fetchAPI("/api/chat/onboarding", { method: "POST", body: JSON.stringify(data) });
+
+// Photo Analysis (AI profile generation)
+export const analyzePhoto = (data: { description?: string }) =>
+  fetchAPI("/api/talent/analyze-photo", { method: "POST", body: JSON.stringify(data) });
+
 // Health
 export const getHealth = () => fetchAPI("/api/health");

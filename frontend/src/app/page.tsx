@@ -330,7 +330,7 @@ export default function HomePage() {
                 { icon: Timer, label: "Time-Stamping Usage Tracking" },
               ]}
               cta="Apply as Agent"
-              href="/talent/register"
+              href="/agent/register"
             />
             <RoleCard
               title="FOR BRANDS"
@@ -562,6 +562,9 @@ export default function HomePage() {
               <span className="font-semibold text-[#0B0B0F]">Z.AI</span>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/talent/library" className="font-body text-xs text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
+                Talent Library
+              </Link>
               <Link href="/agents" className="font-body text-xs text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
                 Agent Dashboard
               </Link>

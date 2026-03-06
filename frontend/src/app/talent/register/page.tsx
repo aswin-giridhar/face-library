@@ -2,250 +2,218 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Check } from "lucide-react";
 import { registerTalent } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+
+const categories = [
+  "Influencer",
+  "Model",
+  "Actor",
+  "Sports Professional",
+  "Celebrity",
+  "None of the above",
+];
+
+const ages = Array.from({ length: 63 }, (_, i) => i + 18);
 
 export default function TalentRegisterPage() {
+  const router = useRouter();
+  const { setUser } = useAuth();
   const [form, setForm] = useState({
     name: "",
     email: "",
-    bio: "",
-    categories: "",
-    restricted_categories: "",
-    min_price_per_use: 100,
-    max_license_duration_days: 365,
-    allow_ai_training: false,
-    allow_video_generation: true,
-    allow_image_generation: true,
-    geo_restrictions: "",
-    portfolio_description: "",
+    stage_name: "",
+    age: "",
+    category: "",
   });
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const update = (field: string, value: unknown) =>
+  const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.category) {
+      setErrorMsg("Please select a category.");
+      return;
+    }
     setStatus("loading");
+    setErrorMsg("");
     try {
-      const res = await registerTalent(form);
-      setResult(res);
+      const res = await registerTalent({
+        name: form.name,
+        email: form.email,
+        bio: form.stage_name ? `Stage name: ${form.stage_name}` : "",
+        categories: form.category,
+        min_price_per_use: 100,
+        max_license_duration_days: 365,
+        allow_ai_training: false,
+        allow_video_generation: true,
+        allow_image_generation: true,
+      });
+      setUser({
+        user_id: res.user_id || res.id,
+        email: form.email,
+        name: form.name,
+        role: "talent",
+        profile_id: res.id,
+      });
       setStatus("success");
+      setTimeout(() => router.push("/onboarding/chat"), 1500);
     } catch {
       setStatus("error");
+      setErrorMsg("Registration failed. Please try again.");
     }
   };
 
-  if (status === "success" && result) {
+  if (status === "success") {
     return (
-      <div className="min-h-screen bg-[#FAFAF8] flex items-center justify-center px-8">
+      <div className="min-h-screen bg-white flex items-center justify-center px-8">
         <div className="max-w-md text-center">
-          <div className="w-16 h-16 rounded-full bg-[#1E3A5F] flex items-center justify-center mx-auto mb-6">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#4F6AF6] to-[#6C8AFF] flex items-center justify-center mx-auto mb-6">
             <Check className="w-8 h-8 text-white" />
           </div>
-          <h1 className="font-display text-3xl text-[#0B0B0F] mb-2">Welcome to Face Library</h1>
+          <h1 className="font-display text-3xl text-[#0B0B0F] mb-2">Welcome aboard!</h1>
           <p className="font-body text-[#6B6B73] mb-6">
-            Your talent profile has been created. Your ID is <strong>#{String(result.id)}</strong>.
+            Redirecting you to set up your profile...
           </p>
-          <Link
-            href="/talent/dashboard"
-            className="inline-flex items-center gap-2 bg-[#0B0B0F] text-[#FAFAF8] font-body text-sm font-medium py-3 px-8 rounded-md hover:bg-[#1E3A5F] transition-colors"
-          >
-            Go to Dashboard
-            <ArrowRight className="w-4 h-4" />
-          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8]">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-8 lg:px-16 h-16 border-b border-[#E0E0DA] bg-white">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#0B0B0F]">
-            <span className="font-display text-sm font-bold italic text-[#0B0B0F]">FL</span>
-          </div>
-          <div className="flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-center py-8">
+        <Link href="/" className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#0B0B0F]">
+              <span className="font-display text-sm font-bold italic text-[#0B0B0F]">FL</span>
+            </div>
             <span className="font-body text-sm font-bold tracking-[0.2em] text-[#0B0B0F]">FACE LIBRARY</span>
-            <span className="font-body text-[7px] font-light tracking-[0.25em] text-[#6B6B73]">LIKENESS INFRASTRUCTURE</span>
           </div>
+          <span className="font-body text-[10px] font-light tracking-[0.2em] text-[#9B9BA3]">
+            Secure Likeness Licensing Platform
+          </span>
         </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2 font-body text-sm text-[#6B6B73] hover:text-[#0B0B0F] transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Link>
-        </div>
-      </nav>
+      </header>
 
-      <div className="max-w-2xl mx-auto px-8 py-16">
-        <div className="mb-10">
-          <p className="font-body text-xs tracking-[0.25em] uppercase text-[#1E3A5F] mb-3">
-            Talent Registration
-          </p>
-          <h1 className="font-display text-4xl font-light text-[#0B0B0F] leading-tight">
-            Take control of your <span className="italic">likeness</span>
-          </h1>
-          <p className="font-body text-[#6B6B73] mt-3">
-            Set your terms, restrict categories, and let AI agents negotiate on your behalf.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Info */}
-          <fieldset className="space-y-4">
-            <legend className="font-body text-xs tracking-[0.2em] uppercase text-[#1E3A5F] mb-4">
-              Basic Information
-            </legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="font-body text-xs text-[#6B6B73] mb-1 block">Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={form.name}
-                  onChange={(e) => update("name", e.target.value)}
-                  className="w-full bg-white border border-[#E0E0DA] rounded-md px-4 py-3 font-body text-sm text-[#0B0B0F] focus:outline-none focus:border-[#1E3A5F] transition-colors"
-                  placeholder="Jane Doe"
-                />
-              </div>
-              <div>
-                <label className="font-body text-xs text-[#6B6B73] mb-1 block">Email *</label>
-                <input
-                  type="email"
-                  required
-                  value={form.email}
-                  onChange={(e) => update("email", e.target.value)}
-                  className="w-full bg-white border border-[#E0E0DA] rounded-md px-4 py-3 font-body text-sm text-[#0B0B0F] focus:outline-none focus:border-[#1E3A5F] transition-colors"
-                  placeholder="jane@example.com"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="font-body text-xs text-[#6B6B73] mb-1 block">Bio</label>
-              <textarea
-                value={form.bio}
-                onChange={(e) => update("bio", e.target.value)}
-                rows={3}
-                className="w-full bg-white border border-[#E0E0DA] rounded-md px-4 py-3 font-body text-sm text-[#0B0B0F] focus:outline-none focus:border-[#1E3A5F] transition-colors resize-none"
-                placeholder="Tell brands about yourself..."
-              />
-            </div>
-          </fieldset>
-
-          {/* Licensing Preferences */}
-          <fieldset className="space-y-4">
-            <legend className="font-body text-xs tracking-[0.2em] uppercase text-[#1E3A5F] mb-4">
-              Licensing Preferences
-            </legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="font-body text-xs text-[#6B6B73] mb-1 block">Minimum Price Per Use (£)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={form.min_price_per_use}
-                  onChange={(e) => update("min_price_per_use", Number(e.target.value))}
-                  className="w-full bg-white border border-[#E0E0DA] rounded-md px-4 py-3 font-body text-sm text-[#0B0B0F] focus:outline-none focus:border-[#1E3A5F] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="font-body text-xs text-[#6B6B73] mb-1 block">Max License Duration (days)</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={form.max_license_duration_days}
-                  onChange={(e) => update("max_license_duration_days", Number(e.target.value))}
-                  className="w-full bg-white border border-[#E0E0DA] rounded-md px-4 py-3 font-body text-sm text-[#0B0B0F] focus:outline-none focus:border-[#1E3A5F] transition-colors"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="font-body text-xs text-[#6B6B73] mb-1 block">Allowed Categories</label>
-              <input
-                type="text"
-                value={form.categories}
-                onChange={(e) => update("categories", e.target.value)}
-                className="w-full bg-white border border-[#E0E0DA] rounded-md px-4 py-3 font-body text-sm text-[#0B0B0F] focus:outline-none focus:border-[#1E3A5F] transition-colors"
-                placeholder="fashion, beauty, lifestyle"
-              />
-            </div>
-            <div>
-              <label className="font-body text-xs text-[#6B6B73] mb-1 block">Restricted Categories</label>
-              <input
-                type="text"
-                value={form.restricted_categories}
-                onChange={(e) => update("restricted_categories", e.target.value)}
-                className="w-full bg-white border border-[#E0E0DA] rounded-md px-4 py-3 font-body text-sm text-[#0B0B0F] focus:outline-none focus:border-[#1E3A5F] transition-colors"
-                placeholder="gambling, alcohol, tobacco, adult content"
-              />
-            </div>
-            <div>
-              <label className="font-body text-xs text-[#6B6B73] mb-1 block">Geo Restrictions (blocked regions)</label>
-              <input
-                type="text"
-                value={form.geo_restrictions}
-                onChange={(e) => update("geo_restrictions", e.target.value)}
-                className="w-full bg-white border border-[#E0E0DA] rounded-md px-4 py-3 font-body text-sm text-[#0B0B0F] focus:outline-none focus:border-[#1E3A5F] transition-colors"
-                placeholder="e.g. RU, CN, IR"
-              />
-            </div>
-          </fieldset>
-
-          {/* Content Permissions */}
-          <fieldset className="space-y-3">
-            <legend className="font-body text-xs tracking-[0.2em] uppercase text-[#1E3A5F] mb-4">
-              Content Permissions
-            </legend>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.allow_image_generation}
-                onChange={(e) => update("allow_image_generation", e.target.checked)}
-                className="w-4 h-4 accent-[#1E3A5F]"
-              />
-              <span className="font-body text-sm text-[#0B0B0F]">Allow AI image generation</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.allow_video_generation}
-                onChange={(e) => update("allow_video_generation", e.target.checked)}
-                className="w-4 h-4 accent-[#1E3A5F]"
-              />
-              <span className="font-body text-sm text-[#0B0B0F]">Allow AI video generation</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.allow_ai_training}
-                onChange={(e) => update("allow_ai_training", e.target.checked)}
-                className="w-4 h-4 accent-[#1E3A5F]"
-              />
-              <span className="font-body text-sm text-[#0B0B0F]">Allow use of likeness for AI model training</span>
-            </label>
-          </fieldset>
-
-          <button
-            type="submit"
-            disabled={status === "loading"}
-            className="w-full inline-flex items-center justify-center gap-2 bg-[#0B0B0F] text-[#FAFAF8] font-body text-sm font-medium tracking-wide py-4 px-8 rounded-md hover:bg-[#1E3A5F] transition-colors duration-300 disabled:opacity-50"
-          >
-            {status === "loading" ? "Registering..." : "Register as Talent"}
-            <ArrowRight className="w-4 h-4" />
-          </button>
-
-          {status === "error" && (
-            <p className="font-body text-sm text-red-600 text-center">
-              Registration failed. Please try again.
+      {/* Form */}
+      <main className="flex-1 flex items-start justify-center px-6 pb-16">
+        <div className="w-full max-w-[480px]">
+          <div className="text-center mb-10">
+            <h1 className="font-display text-3xl md:text-4xl font-light text-[#0B0B0F] mb-3">
+              Create Your Talent Profile
+            </h1>
+            <p className="font-body text-[15px] text-[#6B6B73]">
+              Tell us a little about yourself so brands can discover you.
             </p>
-          )}
-        </form>
-      </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <input
+                type="text"
+                required
+                value={form.name}
+                onChange={(e) => update("name", e.target.value)}
+                placeholder="Full Name"
+                className="w-full bg-[#F8F8FA] border border-[#E8E8EC] rounded-xl px-5 py-3.5 font-body text-[15px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none focus:ring-2 focus:ring-[#4F6AF6]/30 focus:border-[#4F6AF6] transition-all"
+              />
+            </div>
+
+            <div>
+              <input
+                type="email"
+                required
+                value={form.email}
+                onChange={(e) => update("email", e.target.value)}
+                placeholder="Email Address"
+                className="w-full bg-[#F8F8FA] border border-[#E8E8EC] rounded-xl px-5 py-3.5 font-body text-[15px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none focus:ring-2 focus:ring-[#4F6AF6]/30 focus:border-[#4F6AF6] transition-all"
+              />
+            </div>
+
+            <div>
+              <input
+                type="text"
+                value={form.stage_name}
+                onChange={(e) => update("stage_name", e.target.value)}
+                placeholder="Talent / Stage Name (optional)"
+                className="w-full bg-[#F8F8FA] border border-[#E8E8EC] rounded-xl px-5 py-3.5 font-body text-[15px] text-[#0B0B0F] placeholder-[#B0B0B8] focus:outline-none focus:ring-2 focus:ring-[#4F6AF6]/30 focus:border-[#4F6AF6] transition-all"
+              />
+            </div>
+
+            <div>
+              <select
+                value={form.age}
+                onChange={(e) => update("age", e.target.value)}
+                className="w-full bg-[#F8F8FA] border border-[#E8E8EC] rounded-xl px-5 py-3.5 font-body text-[15px] text-[#0B0B0F] focus:outline-none focus:ring-2 focus:ring-[#4F6AF6]/30 focus:border-[#4F6AF6] transition-all appearance-none"
+                style={{ color: form.age ? "#0B0B0F" : "#B0B0B8" }}
+              >
+                <option value="" disabled>Age</option>
+                {ages.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Category Selection */}
+            <div className="pt-2">
+              <p className="font-body text-[13px] text-[#6B6B73] mb-3">Category</p>
+              <div className="space-y-2.5">
+                {categories.map((cat) => (
+                  <label
+                    key={cat}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${
+                      form.category === cat
+                        ? "border-[#4F6AF6] bg-[#4F6AF6]/5"
+                        : "border-[#E8E8EC] bg-[#F8F8FA] hover:border-[#D0D0D8]"
+                    }`}
+                  >
+                    <div
+                      className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all ${
+                        form.category === cat
+                          ? "border-[#4F6AF6]"
+                          : "border-[#C8C8D0]"
+                      }`}
+                    >
+                      {form.category === cat && (
+                        <div className="w-[10px] h-[10px] rounded-full bg-[#4F6AF6]" />
+                      )}
+                    </div>
+                    <span className="font-body text-[14px] text-[#0B0B0F]">{cat}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={status === "loading"}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#4F6AF6] to-[#6C8AFF] text-white font-body text-[15px] font-semibold py-4 px-8 rounded-xl hover:shadow-lg hover:shadow-[#4F6AF6]/25 transition-all duration-300 disabled:opacity-50"
+              >
+                {status === "loading" ? "Creating..." : "Continue"}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {errorMsg && (
+              <p className="font-body text-sm text-red-500 text-center">{errorMsg}</p>
+            )}
+
+            <p className="font-body text-[11px] text-[#9B9BA3] text-center leading-relaxed">
+              By continuing, you agree to our{" "}
+              <span className="underline cursor-pointer">Terms of Service</span> and confirm
+              the information is accurate.
+            </p>
+          </form>
+        </div>
+      </main>
     </div>
   );
 }
