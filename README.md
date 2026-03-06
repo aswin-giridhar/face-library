@@ -43,6 +43,7 @@ Face Library provides a multi-agent platform where:
    - Web3 smart contract metadata
    - Immutable audit logging
 5. **Talent** reviews and approves/rejects with full transparency
+6. **Brands** pay for approved licenses via Stripe Connect
 
 ---
 
@@ -54,11 +55,13 @@ Face Library provides a multi-agent platform where:
                          |   (19 Pages)     |
                          +--------+---------+
                                   |
-                                  | REST API
-                                  |
+                    +-------------+-------------+
+                    |             |             |
+               REST API    Telegram Bot   Stripe Connect
+                    |             |             |
                          +--------+---------+
                          |   FastAPI        |
-                         |   (Backend)      |
+                         |  (42 Endpoints)  |
                          +--------+---------+
                                   |
               +-------------------+-------------------+
@@ -67,8 +70,8 @@ Face Library provides a multi-agent platform where:
         |Compliance| |Pricing | |IP       | |Avatar | |Likeness    |
         |& Risk    | |Negoti- | |Contract | |Gener- | |Fingerprint |
         |Agent     | |ator    | |Agent    | |ation  | |Agent       |
-        |DeepSeek  | |Qwen3   | |GLM-4    | |Deep-  | |DeepSeek    |
-        |+GLM summ | |235B    | |Plus     | |Seek   | |V3.2       |
+        |DeepSeek  | |Qwen3   | |GLM-4.5  | |Deep-  | |DeepSeek    |
+        |+GLM summ | |235B    | |(Z.AI)   | |Seek   | |V3.2       |
         +-----+----+ +---+----+ +----+----+ +--+----+ +---+--------+
               |           |          |          |          |
         +-----+---+ +----+----+ +---+--------+ |          |
@@ -85,17 +88,26 @@ Face Library provides a multi-agent platform where:
               |
         +-----+---------------------------------------------------+
         |                   OpenClaw Gateway                       |
-        |   FLock.io API  |  Z.AI GLM  |  Anyway SDK (Tracing)    |
+        |   FLock.io API  |  Z.AI GLM  |  OpenRouter  |  Anyway   |
         +---------------------------------------------------------+
 ```
+
+### Multi-Channel Deployment
+
+| Channel | Description |
+|---------|-------------|
+| **Web App** | 19-page Next.js application with role-based dashboards |
+| **REST API** | 42 endpoints with Swagger docs |
+| **Telegram Bot** | `/search`, `/status`, `/agents` commands via webhook |
+| **Stripe Connect** | Payment checkout for license commercialization |
 
 ### 7-Step Agent Pipeline
 
 When a brand submits a license request, the orchestrator runs:
 
-1. **Compliance & Risk Agent** -- Assesses content risk, brand risk, legal risk, ethical risk, and geographic risk using DeepSeek V3.2. Generates executive summary via Z.AI GLM-4 Plus. Returns risk level and recommendation.
+1. **Compliance & Risk Agent** -- Assesses content risk, brand risk, legal risk, ethical risk, and geographic risk using DeepSeek V3.2. Generates executive summary via Z.AI GLM-4.5. Returns risk level and recommendation.
 2. **Pricing Negotiator Agent** -- Analyzes talent preferences and market rates using Qwen3 235B. Proposes dynamic pricing with breakdown, confidence score, and SDG 8 alignment.
-3. **IP Contract Agent** -- Generates a full UK-law-compliant IP license agreement using Z.AI GLM-4 Plus (128K context). 12 sections covering parties, definitions, grant of rights, restrictions, compensation, IP ownership, data protection, warranties, termination, liability, dispute resolution, and general provisions. Falls back to FLock Qwen3 235B Thinking.
+3. **IP Contract Agent** -- Generates a full UK-law-compliant IP license agreement using Z.AI GLM-4.5 (128K context). 12 sections covering parties, definitions, grant of rights, restrictions, compensation, IP ownership, data protection, warranties, termination, liability, dispute resolution, and general provisions. Falls back to FLock Qwen3 235B Thinking.
 4. **License Token** -- Issues a UUID license token for tracking.
 5. **Avatar Generation Agent** -- Generates detailed image/avatar prompts using DeepSeek V3.2, ready for dispatch to Z.AI image generation.
 6. **Likeness Fingerprint Agent** -- Simulates unauthorized use detection scan using DeepSeek V3.2. Generates fingerprint ID and scan report with platforms checked, violations found, and risk score.
@@ -124,6 +136,16 @@ Face Library uses **all 5 FLock open-source models** as the primary LLM provider
 | (Available) | Qwen3 30B | Primary | General analysis |
 | (Available) | Kimi K2.5 | Long Context | 128K context for extended analysis |
 
+**OpenClaw Integration:**
+- Full `openclaw.json` gateway config with all 9 agents, pipeline definition, model assignments, and SDG tags
+- `/api/openclaw/config` endpoint serves the gateway configuration
+- Pipeline steps, human-approval flow, and workspace paths defined per agent
+
+**Multi-Channel Deployment:**
+- **Web App** (Next.js, 19 pages) -- Full role-based dashboards for talent, agents, and brands
+- **REST API** (42 endpoints) -- Complete programmatic access with Swagger docs
+- **Telegram Bot** -- `/search`, `/status`, `/agents` commands via webhook at `/api/telegram/webhook`
+
 **SDG Alignment:**
 - **SDG 8 (Decent Work)** -- Creating fair economic opportunities for creators. Negotiator agent ensures pricing aligns with market rates. `/api/sdg/impact` endpoint tracks creator compensation metrics.
 - **SDG 10 (Reduced Inequalities)** -- Ensuring individual creators have the same IP protection as large corporations. Compliance agent blocks unfair requests.
@@ -143,8 +165,10 @@ The `openclaw.json` gateway registers Z.AI as a dedicated provider. The LLM clie
 ### 3. Claw for Human -- Most Impactful AI Agent ($500)
 
 Face Library is built entirely on the OpenClaw platform:
-- `openclaw.json` gateway configuration with FLock + Z.AI providers (6 models across 2 providers)
-- 9 agent definitions with workspace paths, model assignments, and SDG tags
+- `openclaw.json` gateway configuration with FLock + Z.AI + OpenRouter providers (7 models across 3 providers)
+- 9 agent definitions with workspace paths, model assignments, tools, and SDG tags
+- Pipeline definition with 7 steps, blocking/non-blocking config, and human-approval gate
+- Multi-channel deployment (Web, API, Telegram)
 - Anyway tracing plugin for full observability (session/agent/LLM/tool spans)
 - Rich agent dashboard showing per-agent stats, model registry, and SDG badges
 - Claw Console for real-time audit log viewing across all agents
@@ -152,16 +176,29 @@ Face Library is built entirely on the OpenClaw platform:
 
 ### 4. AnyWay -- Best Use of Anyway SDK (Mac Mini)
 
-Full OpenTelemetry tracing integration via `backend/tracing.py`:
+**Anyway SDK Integration:**
+- `Traceloop.init()` from `anyway-sdk` for automatic LLM call instrumentation
+- Auto-instruments all OpenAI client calls (FLock, Z.AI, OpenRouter) -- captures prompts, completions, tokens, latency
+- Custom spans: session-level (pipeline), agent-level (per agent), LLM-level (per call), tool-level (DB ops)
+- Exports to `https://trace-dev-collector.anyway.sh/` with Bearer token auth
+- 100% sample rate, full content capture
 
-- **Session-level spans** for each license request pipeline (wraps entire orchestrator run)
-- **Agent-level spans** for each AI agent invocation (all 9 agents)
-- **LLM-level spans** for each model call (model, provider, tokens, latency)
-- **Tool-level spans** for database operations (audit writes, trail reads, stats queries)
+**Commercialization (Stripe Connect):**
+- `POST /api/payments/checkout` -- Creates Stripe Checkout sessions for license payments
+- `POST /api/payments/webhook` -- Handles payment completion events
+- `GET /api/payments/revenue` -- Revenue dashboard (total revenue, platform fees, talent payouts)
+- 10% platform fee model: 90% goes to talent, 10% to Face Library
+- Instant pricing API at `POST /api/pricing/estimate` for algorithmic estimates
 
-Traces export to `https://trace-dev-collector.anyway.sh` with full content capture. The `openclaw.json` plugin config captures all 4 span types at 100% sample rate.
-
-Additionally, a self-service **pricing API** (`POST /api/pricing/estimate`) supports the commercialization requirement by providing instant algorithmic price estimates for brands.
+**Setup:**
+```python
+from anyway.sdk import Traceloop
+Traceloop.init(
+    app_name="face-library",
+    api_endpoint="https://trace-dev-collector.anyway.sh/",
+    headers={"Authorization": "Bearer <ANYWAY_API_KEY>"},
+)
+```
 
 ### 5. Animoca Brands -- Best Multi-Agent System ($1,000 USD)
 
@@ -181,11 +218,12 @@ Face Library is a coordinated multi-agent system where 9 specialized AI agents c
 |-------|-----------|
 | Frontend | Next.js 16, React, TypeScript, Tailwind CSS |
 | Backend | Python, FastAPI, SQLAlchemy, SQLite |
-| LLM Providers | FLock.io (Qwen3 30B/235B, DeepSeek V3.2, Kimi K2.5), Z.AI (GLM-4 Plus / GLM-4.5 via OpenRouter) |
-| Agent Platform | OpenClaw (gateway config, 9 agent definitions, 2 providers) |
-| Observability | Anyway SDK (OpenTelemetry -- session/agent/LLM/tool spans) |
-| Tracing | `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` |
+| LLM Providers | FLock.io (Qwen3 30B/235B, DeepSeek V3.2, Kimi K2.5), Z.AI (GLM-4.5 via OpenRouter) |
+| Agent Platform | OpenClaw (gateway config, 9 agent definitions, 3 providers, pipeline definition) |
+| Observability | Anyway SDK (`anyway-sdk` -- auto-instruments OpenAI calls + custom spans) |
 | Auth | Supabase Auth (primary) + SHA-256 salted password hashing (fallback) |
+| Payments | Stripe Connect (license payments, 10% platform fee) |
+| Multi-Channel | Web (Next.js), REST API (42 endpoints), Telegram Bot |
 | Web3 | ERC-721, Polygon (via Web3 Rights Agent) |
 
 ---
@@ -237,6 +275,7 @@ Face Library is a coordinated multi-agent system where 9 specialized AI agents c
 3. Dashboard: browse talent library, create license requests
 4. Trigger pipeline -> 7-agent processing (compliance -> negotiation -> contract -> token -> avatar -> fingerprint -> web3 -> audit)
 5. View results at `/license/[id]` -- risk score, proposed price, full contract, audit trail
+6. Pay for approved license via Stripe Checkout -> revenue tracked at `/api/payments/revenue`
 
 ---
 
@@ -289,13 +328,15 @@ Open http://localhost:3000
 | `ZAI_API_KEY` | Z.AI API key for GLM-4 Plus (direct) | Optional |
 | `ZAI_BASE_URL` | Z.AI endpoint (`https://open.bigmodel.cn/api/paas/v4`) | Optional |
 | `OPENROUTER_API_KEY` | OpenRouter API key (GLM-4.5 fallback for Z.AI) | Yes |
+| `ANYWAY_API_KEY` | Anyway SDK key for tracing | Yes |
+| `STRIPE_SECRET_KEY` | Stripe secret key for payments (test mode) | Yes |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | Optional |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot API token | Optional |
 | `DATABASE_URL` | Database URL (SQLite or PostgreSQL) | Yes |
 | `SUPABASE_URL` | Supabase project URL | Yes |
 | `SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes |
 | `SECRET_KEY` | App secret for session signing | Yes |
-| `ANYWAY_API_KEY` | Anyway SDK key for tracing | Optional |
-| `ANYWAY_ENDPOINT` | Anyway collector URL | Optional |
 | `NEXT_PUBLIC_API_URL` | Backend URL for frontend (Vercel env) | Production |
 
 ### Deployment
@@ -319,7 +360,7 @@ Open http://localhost:3000
 
 ---
 
-## API Endpoints
+## API Endpoints (42 Routes)
 
 ### Auth
 | Method | Endpoint | Description |
@@ -377,13 +418,27 @@ Open http://localhost:3000
 | GET | `/api/audit/logs` | All agent audit logs (Claw Console) |
 | GET | `/api/audit/{id}` | Audit trail for specific license |
 
-### Utility
+### Payments (Stripe Connect)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| POST | `/api/payments/checkout` | Create Stripe Checkout session for license payment |
+| POST | `/api/payments/webhook` | Handle Stripe payment events |
+| GET | `/api/payments/revenue` | Revenue dashboard (total, fees, payouts) |
+
+### Multi-Channel (Telegram)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/telegram/webhook` | Handle Telegram bot messages |
+| POST | `/api/telegram/setup` | Register webhook URL with Telegram |
+
+### OpenClaw & Utility
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/openclaw/config` | OpenClaw gateway configuration |
 | POST | `/api/pricing/estimate` | Algorithmic pricing estimate |
 | GET | `/api/sdg/impact` | SDG impact metrics |
 | POST | `/api/chat/onboarding` | Onboarding chat (talent/brand/agent) |
-| GET | `/api/health` | Health check (version, agent count, pipeline info) |
+| GET | `/api/health` | Health check (version, agents, channels, commercialization) |
 
 ---
 
@@ -392,6 +447,7 @@ Open http://localhost:3000
 - **[User Guide](USER_GUIDE.md)** -- Complete walkthrough for talent, agents, and brands
 - **[Pitch Deck](PITCHDECK.md)** -- Hackathon presentation deck
 - **[API Docs (Live)](https://face-library.onrender.com/docs)** -- Interactive Swagger UI
+- **[OpenClaw Config](agents/openclaw.json)** -- Gateway configuration for 9 agents
 
 ---
 
