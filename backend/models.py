@@ -224,24 +224,33 @@ def init_db():
 def seed_demo_data():
     """Populate DB with demo data if empty (so deploys aren't blank)."""
     import hashlib
+    import secrets
+
+    def _hash(password: str) -> str:
+        salt = secrets.token_hex(16)
+        h = hashlib.sha256((salt + password).encode()).hexdigest()
+        return f"{salt}:{h}"
+
     db = SessionLocal()
     try:
         if db.query(User).count() > 0:
             return  # already seeded
 
+        demo_pw = _hash("demo123")
+
         # --- Users ---
         talent_user = User(
             email="emma@demo.test", name="Emma Clarke", role="talent",
-            password_hash=hashlib.sha256("demo123".encode()).hexdigest(),
+            password_hash=demo_pw,
         )
         brand_user = User(
             email="james@luxbrand.test", name="James Wilson", role="brand",
             company="LuxFashion UK",
-            password_hash=hashlib.sha256("demo123".encode()).hexdigest(),
+            password_hash=_hash("demo123"),
         )
         talent_user2 = User(
             email="marcus@demo.test", name="Marcus Chen", role="talent",
-            password_hash=hashlib.sha256("demo123".encode()).hexdigest(),
+            password_hash=_hash("demo123"),
         )
         db.add_all([talent_user, brand_user, talent_user2])
         db.flush()
