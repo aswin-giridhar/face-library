@@ -228,12 +228,12 @@
     "web": {
       "type": "nextjs",
       "url": "https://face-library.vercel.app",
-      "description": "17-page web application with role-based dashboards"
+      "description": "17-page Next.js web application with role-based dashboards"
     },
     "api": {
       "type": "rest",
       "url": "https://face-library.onrender.com",
-      "description": "32+ REST API endpoints with Swagger docs"
+      "description": "38 REST API endpoints with Swagger docs"
     },
     "telegram": {
       "type": "telegram",

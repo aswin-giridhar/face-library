@@ -2,7 +2,9 @@
 
 **Secure AI Likeness Licensing Infrastructure**
 
-Face Library is a permission and monetization layer for human identity in generative AI. It enables talent (actors, models, public figures) to control how their likeness is used by brands and AI systems, with 9 AI agents handling compliance, negotiation, contract generation, avatar prompts, fingerprinting, Web3 rights, and audit -- end to end.
+Face Library is a secure licensing infrastructure for human identity in generative AI. The platform enables actors, models, influencers, and public figures to control how their digital likeness is used in AI-generated content. It provides a permission layer where brands can legally license human likeness for advertising, media, and synthetic content production.
+
+The system solves a critical infrastructure gap in generative AI: there is currently no standardized way to manage consent, licensing, compliance, and compensation for human identity used in AI-generated media.
 
 Built for the **UK AI Agent Hackathon EP.4 x OpenClaw** (March 2026, Imperial College London) by team **Not.Just.AI**.
 
@@ -28,11 +30,11 @@ Generative AI can now create hyper-realistic images and videos of real people. T
 
 ## The Solution
 
-Face Library provides a multi-agent platform where:
+Face Library introduces a multi-agent workflow that automates the entire licensing process:
 
-1. **Talent** registers their likeness preferences (allowed categories, pricing, geo restrictions, social media, agency representation)
+1. **Talent** registers their identity, preferences, and usage restrictions on the platform. They can define allowed advertising categories, geographic limitations, pricing, social media links, and approval rules.
 2. **Agents (Talent Agencies)** manage talent rosters with configurable approval workflows
-3. **Brands** submit license requests describing their intended use
+3. **Brands** submit licensing requests describing their intended use of a digital likeness
 4. **9 AI Agents** autonomously process requests through a 7-step pipeline:
    - Compliance & risk assessment
    - Dynamic price negotiation
@@ -45,6 +47,10 @@ Face Library provides a multi-agent platform where:
 5. **Talent** reviews and approves/rejects with full transparency
 6. **Brands** pay for approved licenses via Stripe Connect
 
+The result is an end-to-end infrastructure that allows creators to control, license, and monetize their digital identity, while giving brands a legally compliant way to use AI-generated humans.
+
+Face Library aims to become the governance layer for AI likeness licensing and the foundation for the future digital human economy.
+
 ---
 
 ## Architecture
@@ -52,7 +58,7 @@ Face Library provides a multi-agent platform where:
 ```
                          +------------------+
                          |   Next.js App    |
-                         |   (19 Pages)     |
+                         |   (17 Pages)     |
                          +--------+---------+
                                   |
                     +-------------+-------------+
@@ -61,7 +67,7 @@ Face Library provides a multi-agent platform where:
                     |             |             |
                          +--------+---------+
                          |   FastAPI        |
-                         |  (42 Endpoints)  |
+                         |  (38 Endpoints)  |
                          +--------+---------+
                                   |
               +-------------------+-------------------+
@@ -70,8 +76,8 @@ Face Library provides a multi-agent platform where:
         |Compliance| |Pricing | |IP       | |Avatar | |Likeness    |
         |& Risk    | |Negoti- | |Contract | |Gener- | |Fingerprint |
         |Agent     | |ator    | |Agent    | |ation  | |Agent       |
-        |DeepSeek  | |Qwen3   | |GLM-4.5  | |Deep-  | |DeepSeek    |
-        |+GLM summ | |235B    | |(Z.AI)   | |Seek   | |V3.2       |
+        |DeepSeek  | |Qwen3   | |GLM-4    | |Deep-  | |DeepSeek    |
+        |+GLM summ | |235B    | |(Z.AI)   | |Seek   | |V3.2        |
         +-----+----+ +---+----+ +----+----+ +--+----+ +---+--------+
               |           |          |          |          |
         +-----+---+ +----+----+ +---+--------+ |          |
@@ -96,8 +102,8 @@ Face Library provides a multi-agent platform where:
 
 | Channel | Description |
 |---------|-------------|
-| **Web App** | 19-page Next.js application with role-based dashboards |
-| **REST API** | 42 endpoints with Swagger docs |
+| **Web App** | 17-page Next.js application with role-based dashboards |
+| **REST API** | 38 endpoints with Swagger docs |
 | **Telegram Bot** | `/search`, `/status`, `/agents` commands via webhook |
 | **Stripe Connect** | Payment checkout for license commercialization |
 
@@ -105,9 +111,9 @@ Face Library provides a multi-agent platform where:
 
 When a brand submits a license request, the orchestrator runs:
 
-1. **Compliance & Risk Agent** -- Assesses content risk, brand risk, legal risk, ethical risk, and geographic risk using DeepSeek V3.2. Generates executive summary via Z.AI GLM-4.5. Returns risk level and recommendation.
+1. **Compliance & Risk Agent** -- Assesses content risk, brand risk, legal risk, ethical risk, and geographic risk using DeepSeek V3.2. Generates executive summary via Z.AI GLM-4 Plus. Returns risk level and recommendation.
 2. **Pricing Negotiator Agent** -- Analyzes talent preferences and market rates using Qwen3 235B. Proposes dynamic pricing with breakdown, confidence score, and SDG 8 alignment.
-3. **IP Contract Agent** -- Generates a full UK-law-compliant IP license agreement using Z.AI GLM-4.5 (128K context). 12 sections covering parties, definitions, grant of rights, restrictions, compensation, IP ownership, data protection, warranties, termination, liability, dispute resolution, and general provisions. Falls back to FLock Qwen3 235B Thinking.
+3. **IP Contract Agent** -- Generates a full UK-law-compliant IP license agreement using Z.AI GLM-4 Plus (128K context). 12 sections covering parties, definitions, grant of rights, restrictions, compensation, IP ownership, data protection, warranties, termination, liability, dispute resolution, and general provisions. Falls back to FLock Qwen3 235B Thinking.
 4. **License Token** -- Issues a UUID license token for tracking.
 5. **Avatar Generation Agent** -- Generates detailed image/avatar prompts using DeepSeek V3.2, ready for dispatch to Z.AI image generation.
 6. **Likeness Fingerprint Agent** -- Simulates unauthorized use detection scan using DeepSeek V3.2. Generates fingerprint ID and scan report with platforms checked, violations found, and risk score.
@@ -142,8 +148,8 @@ Face Library uses **all 5 FLock open-source models** as the primary LLM provider
 - Pipeline steps, human-approval flow, and workspace paths defined per agent
 
 **Multi-Channel Deployment:**
-- **Web App** (Next.js, 19 pages) -- Full role-based dashboards for talent, agents, and brands
-- **REST API** (42 endpoints) -- Complete programmatic access with Swagger docs
+- **Web App** (Next.js, 17 pages) -- Full role-based dashboards for talent, agents, and brands
+- **REST API** (38 endpoints) -- Complete programmatic access with Swagger docs
 - **Telegram Bot** -- `/search`, `/status`, `/agents` commands via webhook at `/api/telegram/webhook`
 
 **SDG Alignment:**
@@ -155,7 +161,7 @@ Face Library uses **all 5 FLock open-source models** as the primary LLM provider
 
 Z.AI GLM models are used as a **core component** in two agents, with a resilient 3-tier fallback chain:
 
-**Fallback chain:** Z.AI Direct API (GLM-4 Plus) → OpenRouter (GLM-4.5, thinking disabled) → FLock (Qwen3 235B Thinking)
+**Fallback chain:** Z.AI Direct API (GLM-4 Plus) -> OpenRouter (GLM-4.5, thinking disabled) -> FLock (Qwen3 235B Thinking)
 
 1. **IP Contract Agent (Primary)** -- Generates full 12-section UK-law-compliant IP licensing agreements covering GDPR, Copyright Act 1988, Consumer Rights Act 2015, and dispute resolution. GLM's large context window is ideal for long structured legal documents.
 2. **Compliance & Risk Agent (Summary)** -- After DeepSeek performs risk analysis, GLM generates concise executive summaries for talent review. This dual-model approach combines fast analysis with high-quality summarization.
@@ -189,6 +195,7 @@ Face Library is built entirely on the OpenClaw platform:
 - `GET /api/payments/revenue` -- Revenue dashboard (total revenue, platform fees, talent payouts)
 - 10% platform fee model: 90% goes to talent, 10% to Face Library
 - Instant pricing API at `POST /api/pricing/estimate` for algorithmic estimates
+- Frontend Pay button on license detail page and brand dashboard
 
 **Setup:**
 ```python
@@ -218,17 +225,17 @@ Face Library is a coordinated multi-agent system where 9 specialized AI agents c
 |-------|-----------|
 | Frontend | Next.js 16, React, TypeScript, Tailwind CSS |
 | Backend | Python, FastAPI, SQLAlchemy, SQLite |
-| LLM Providers | FLock.io (Qwen3 30B/235B, DeepSeek V3.2, Kimi K2.5), Z.AI (GLM-4.5 via OpenRouter) |
+| LLM Providers | FLock.io (Qwen3 30B/235B, DeepSeek V3.2, Kimi K2.5), Z.AI (GLM-4 Plus direct + OpenRouter) |
 | Agent Platform | OpenClaw (gateway config, 9 agent definitions, 3 providers, pipeline definition) |
 | Observability | Anyway SDK (`anyway-sdk` -- auto-instruments OpenAI calls + custom spans) |
 | Auth | Supabase Auth (primary) + SHA-256 salted password hashing (fallback) |
 | Payments | Stripe Connect (license payments, 10% platform fee) |
-| Multi-Channel | Web (Next.js), REST API (42 endpoints), Telegram Bot |
+| Multi-Channel | Web (Next.js), REST API (38 endpoints), Telegram Bot |
 | Web3 | ERC-721, Polygon (via Web3 Rights Agent) |
 
 ---
 
-## Pages & Features (19 Pages)
+## Pages & Features (17 Pages)
 
 | Page | Role | Description |
 |------|------|-------------|
@@ -244,9 +251,9 @@ Face Library is a coordinated multi-agent system where 9 specialized AI agents c
 | `/agent/dashboard` | Agent | Managed talents list, pending approvals queue, contract templates, approve/reject actions |
 | `/brand/register` | Brand | Brand/advertiser profile registration |
 | `/brand/onboarding` | Brand | Brand onboarding chat flow |
-| `/brand/dashboard` | Brand | Create license requests, trigger 7-agent pipeline, view per-request agent results |
+| `/brand/dashboard` | Brand | Create license requests, trigger 7-agent pipeline, pay for licenses, view per-request agent results |
 | `/brand/search` | Brand | AI-powered talent discovery with natural language search via Talent Discovery Agent |
-| `/license/[id]` | All | License detail -- risk assessment, pricing, contract, fingerprint, Web3 metadata, audit trail, approve/reject |
+| `/license/[id]` | All | License detail -- risk assessment, pricing, contract, payment status, fingerprint, Web3 metadata, audit trail, approve/reject |
 | `/agents` | All | System agent dashboard -- stats (actions, tokens, agents, licenses), 9-agent grid, model registry, pipeline architecture diagram |
 | `/claw-console` | All | Real-time audit log viewer with search, agent filter, expandable details, license context |
 
@@ -330,6 +337,7 @@ Open http://localhost:3000
 | `OPENROUTER_API_KEY` | OpenRouter API key (GLM-4.5 fallback for Z.AI) | Yes |
 | `ANYWAY_API_KEY` | Anyway SDK key for tracing | Yes |
 | `STRIPE_SECRET_KEY` | Stripe secret key for payments (test mode) | Yes |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | Yes |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | Optional |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot API token | Optional |
 | `DATABASE_URL` | Database URL (SQLite or PostgreSQL) | Yes |
@@ -360,7 +368,7 @@ Open http://localhost:3000
 
 ---
 
-## API Endpoints (42 Routes)
+## API Endpoints (38 Routes)
 
 ### Auth
 | Method | Endpoint | Description |
@@ -451,11 +459,21 @@ Open http://localhost:3000
 
 ---
 
+## Links
+
+- **GitHub:** https://github.com/aswin-giridhar/face-library
+- **Live Frontend:** https://face-library.vercel.app
+- **Live API:** https://face-library.onrender.com
+- **API Docs:** https://face-library.onrender.com/docs
+- **OpenClaw Config:** https://face-library.onrender.com/api/openclaw/config
+
+---
+
 ## Team
 
 **Not.Just.AI**
 
-Built at the UK AI Agent Hackathon EP.4 x OpenClaw, Imperial College London, March 2026.
+Built at Imperial College London for the UK AI Agent Hackathon EP.4 x OpenClaw, March 2026.
 
 ---
 
