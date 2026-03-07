@@ -269,6 +269,7 @@ def seed_demo_data():
             geo_scope="global",
             approval_mode="manual",
             portfolio_description="High-fashion editorial, luxury brand campaigns, tech product launches",
+            avatar_url="/emma-clarke.webp",
             instagram="@emmaclarke",
             tiktok="@emmaclarke_official",
         )
@@ -285,6 +286,7 @@ def seed_demo_data():
             geo_scope="UK,EU",
             approval_mode="manual",
             portfolio_description="Sports campaigns, fitness brand endorsements, wellness product launches",
+            avatar_url="/marcus-chen.webp",
             instagram="@marcuschen",
             youtube="@MarcusChenFitness",
         )

@@ -471,6 +471,7 @@ def list_talents(db: Session = Depends(get_db)):
             "instagram": tp.instagram,
             "tiktok": tp.tiktok,
             "youtube": tp.youtube,
+            "avatar_url": tp.avatar_url,
         }
         for tp, u in talents
     ]

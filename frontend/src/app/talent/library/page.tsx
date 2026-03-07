@@ -27,6 +27,7 @@ interface Talent {
   instagram: string | null;
   tiktok: string | null;
   youtube: string | null;
+  avatar_url: string | null;
 }
 
 const filterButtons = [
@@ -140,15 +141,19 @@ export default function TalentLibraryPage() {
               className="group cursor-pointer"
             >
               <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-slate-200 to-gray-300 mb-3">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="font-display text-6xl text-white/60 font-light">
-                    {t.name.charAt(0)}
-                  </span>
-                </div>
-                {/* DRAFT watermark */}
-                <div className="absolute inset-0 flex items-center justify-center rotate-[-30deg]">
-                  <span className="font-body text-5xl font-bold text-white/20 tracking-[0.2em]">DRAFT</span>
-                </div>
+                {t.avatar_url ? (
+                  <img
+                    src={t.avatar_url}
+                    alt={t.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="font-display text-6xl text-white/60 font-light">
+                      {t.name.charAt(0)}
+                    </span>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
               </div>
               <h3 className="font-body text-[15px] font-semibold text-[#0B0B0F]">{t.name}</h3>
