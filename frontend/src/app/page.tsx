@@ -401,36 +401,48 @@ export default function HomePage() {
             <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-light text-[#0B0B0F] leading-tight">
               From request to contract
               <br />
-              <span className="italic">in five autonomous steps</span>
+              <span className="italic">in seven autonomous steps</span>
             </h2>
           </div>
 
           <div className="bg-white rounded-lg border border-[#E0E0DA] p-8 lg:p-12 security-pattern">
-            <div className="flex flex-col lg:flex-row gap-6 lg:gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <PipelineStep
                 step="1"
-                label="Request"
-                description="Brand submits a licensing request specifying use case, duration, and regions."
+                label="Compliance & Risk"
+                description="AI scans for content, brand, legal, ethical, and geographic risk."
               />
               <PipelineStep
                 step="2"
-                label="Compliance Check"
-                description="AI scans for risk — content policy, GDPR, geo restrictions, ethical concerns."
-              />
-              <PipelineStep
-                step="3"
-                label="Negotiation"
+                label="Price Negotiation"
                 description="Dynamic pricing proposed based on talent preferences and market rates."
               />
               <PipelineStep
-                step="4"
+                step="3"
                 label="Contract Generation"
-                description="UK-law-compliant IP contract auto-generated with all agreed terms."
+                description="12-section UK-law-compliant IP contract auto-generated via Z.AI GLM."
               />
               <PipelineStep
+                step="4"
+                label="Avatar Prompt"
+                description="Detailed image generation prompt created for the licensed likeness."
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <PipelineStep
                 step="5"
-                label="Approval"
-                description="Talent reviews terms and contract, then approves or requests changes."
+                label="Likeness Fingerprint"
+                description="Scans for unauthorized use of talent likeness across platforms."
+              />
+              <PipelineStep
+                step="6"
+                label="Web3 Rights"
+                description="ERC-721 smart contract metadata generated for on-chain IP tracking."
+              />
+              <PipelineStep
+                step="7"
+                label="Audit & Approval"
+                description="Full audit trail logged. Talent reviews and approves or rejects."
                 isLast
               />
             </div>
@@ -439,11 +451,11 @@ export default function HomePage() {
             <div className="hidden lg:block mt-8 pt-6 border-t border-[#E0E0DA]">
               <div className="flex items-center justify-between">
                 <span className="font-body text-[10px] tracking-[0.15em] uppercase text-[#6B6B73]">
-                  Fully Autonomous
+                  Fully Autonomous (Steps 1–6)
                 </span>
                 <div className="flex-1 mx-6 pipeline-line" />
                 <span className="font-body text-[10px] tracking-[0.15em] uppercase text-[#6B6B73]">
-                  Human-in-the-Loop
+                  Human-in-the-Loop (Step 7)
                 </span>
               </div>
             </div>
