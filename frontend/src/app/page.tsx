@@ -405,58 +405,91 @@ export default function HomePage() {
             </h2>
           </div>
 
-          <div className="bg-white rounded-lg border border-[#E0E0DA] p-8 lg:p-12 security-pattern">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <PipelineStep
-                step="1"
-                label="Compliance & Risk"
-                description="AI scans for content, brand, legal, ethical, and geographic risk."
-              />
-              <PipelineStep
-                step="2"
-                label="Price Negotiation"
-                description="Dynamic pricing proposed based on talent preferences and market rates."
-              />
-              <PipelineStep
-                step="3"
-                label="Contract Generation"
-                description="12-section UK-law-compliant IP contract auto-generated via Z.AI GLM."
-              />
-              <PipelineStep
-                step="4"
-                label="Avatar Prompt"
-                description="Detailed image generation prompt created for the licensed likeness."
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <PipelineStep
-                step="5"
-                label="Likeness Fingerprint"
-                description="Scans for unauthorized use of talent likeness across platforms."
-              />
-              <PipelineStep
-                step="6"
-                label="Web3 Rights"
-                description="ERC-721 smart contract metadata generated for on-chain IP tracking."
-              />
-              <PipelineStep
-                step="7"
-                label="Audit & Approval"
-                description="Full audit trail logged. Talent reviews and approves or rejects."
-                isLast
-              />
+          <div className="bg-[#0B0B0F] rounded-lg p-8 lg:p-12">
+            {/* Pipeline flow */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-0">
+              {/* Left column: Steps 1-4 */}
+              <div className="space-y-1">
+                {[
+                  { step: 1, label: "Compliance & Risk", desc: "Scans content, brand, legal, ethical, and geographic risk across 5 dimensions", model: "DeepSeek V3.2 + GLM-4 Plus", color: "#B45309", tag: "Blocking" },
+                  { step: 2, label: "Price Negotiation", desc: "Dynamic pricing based on talent preferences, market rates, and SDG 8 fair compensation", model: "Qwen3 235B Instruct", color: "#1E3A5F", tag: null },
+                  { step: 3, label: "Contract Generation", desc: "12-section UK-law-compliant IP agreement covering GDPR, Copyright Act 1988, dispute resolution", model: "GLM-4 Plus (Z.AI)", color: "#0F766E", tag: null },
+                  { step: 4, label: "Avatar Prompt", desc: "Detailed image generation prompt crafted from talent profile and campaign requirements", model: "DeepSeek V3.2", color: "#7C3AED", tag: null },
+                ].map((s, i) => (
+                  <div key={s.step} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-display text-base font-bold shrink-0" style={{ backgroundColor: s.color }}>
+                        {s.step}
+                      </div>
+                      {i < 3 && <div className="w-0.5 h-6 bg-gradient-to-b from-white/25 to-white/5" />}
+                    </div>
+                    <div className="pb-4 pt-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-body text-sm font-semibold text-white">{s.label}</h3>
+                        {s.tag && <span className="font-body text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 uppercase tracking-wider">{s.tag}</span>}
+                      </div>
+                      <p className="font-body text-xs text-white/50 mt-1 leading-relaxed">{s.desc}</p>
+                      <span className="inline-block font-mono text-[10px] text-white/25 mt-1.5 px-2 py-0.5 rounded bg-white/5">{s.model}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Right column: Steps 5-7 + Audit */}
+              <div className="space-y-1">
+                {[
+                  { step: 5, label: "Likeness Fingerprint", desc: "Scans for unauthorized use of talent likeness across platforms with violation detection", model: "DeepSeek V3.2", color: "#E11D48", tag: null },
+                  { step: 6, label: "Web3 Rights", desc: "ERC-721 smart contract metadata generated on Polygon for on-chain IP rights tracking", model: "Local (Polygon)", color: "#0891B2", tag: null },
+                  { step: 7, label: "Audit & Logging", desc: "Every agent action logged with timestamps, model identity, and tokens consumed", model: "Local (Claw Console)", color: "#6B21A8", tag: "Every Step" },
+                ].map((s, i) => (
+                  <div key={s.step} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-display text-base font-bold shrink-0" style={{ backgroundColor: s.color }}>
+                        {s.step}
+                      </div>
+                      {i < 2 && <div className="w-0.5 h-6 bg-gradient-to-b from-white/25 to-white/5" />}
+                    </div>
+                    <div className="pb-4 pt-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-body text-sm font-semibold text-white">{s.label}</h3>
+                        {s.tag && <span className={`font-body text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider ${s.tag === "Every Step" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}>{s.tag}</span>}
+                      </div>
+                      <p className="font-body text-xs text-white/50 mt-1 leading-relaxed">{s.desc}</p>
+                      <span className="inline-block font-mono text-[10px] text-white/25 mt-1.5 px-2 py-0.5 rounded bg-white/5">{s.model}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Human approval */}
+                <div className="flex gap-4 mt-2">
+                  <div className="flex flex-col items-center">
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-display text-base font-bold shrink-0 border-2 border-white/30 bg-transparent">
+                      ✓
+                    </div>
+                  </div>
+                  <div className="pt-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-body text-sm font-semibold text-white">Talent Approval</h3>
+                      <span className="font-body text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 uppercase tracking-wider">Human-in-the-Loop</span>
+                    </div>
+                    <p className="font-body text-xs text-white/50 mt-1 leading-relaxed">Talent reviews full pipeline results — risk score, price, contract — and approves or rejects</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Pipeline visualization bar */}
-            <div className="hidden lg:block mt-8 pt-6 border-t border-[#E0E0DA]">
-              <div className="flex items-center justify-between">
-                <span className="font-body text-[10px] tracking-[0.15em] uppercase text-[#6B6B73]">
-                  Fully Autonomous (Steps 1–6)
-                </span>
-                <div className="flex-1 mx-6 pipeline-line" />
-                <span className="font-body text-[10px] tracking-[0.15em] uppercase text-[#6B6B73]">
-                  Human-in-the-Loop (Step 7)
-                </span>
+            {/* Short-circuit + providers */}
+            <div className="mt-8 pt-6 border-t border-white/10">
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <p className="font-body text-xs text-amber-400/80">
+                  <span className="font-semibold">Short-circuit:</span>{" "}
+                  <span className="text-white/40">If Step 1 rejects, steps 2–7 are skipped</span>
+                </p>
+                <div className="flex gap-3 flex-wrap">
+                  {["FLock.io", "Z.AI", "OpenRouter", "Anyway SDK"].map((p) => (
+                    <span key={p} className="font-mono text-[10px] text-white/30 px-2 py-1 rounded bg-white/5">{p}</span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
