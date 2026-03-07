@@ -41,23 +41,16 @@ const filterButtons = [
   "Actor",
 ];
 
-const placeholderTalents = [
-  { name: "Sophie Taylor", role: "Influencer", instagram: "sophie.taylor", color: "from-rose-200 to-pink-300" },
-  { name: "Emily Chen", role: "Actress | Model", instagram: "emilychen", color: "from-violet-200 to-purple-300" },
-  { name: "Mia Rodriguez", role: "Model", instagram: "miarodriguez", color: "from-amber-200 to-orange-300" },
-  { name: "Anna Kuznetsova", role: "Influencer", instagram: "anna.kuznetsova", color: "from-emerald-200 to-teal-300" },
-  { name: "Jessica Lee", role: "Actress", instagram: "jessica.lee", color: "from-sky-200 to-blue-300" },
-  { name: "Chloe Campbell", role: "Influencer", instagram: "chloe.campbell", color: "from-fuchsia-200 to-pink-300" },
-];
 
 export default function TalentLibraryPage() {
   const { user } = useAuth();
   const [talents, setTalents] = useState<Talent[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    listTalents().then(setTalents).catch(() => {});
+    listTalents().then(setTalents).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const filteredTalents = talents.filter((t) => {
@@ -168,35 +161,17 @@ export default function TalentLibraryPage() {
             </Link>
           ))}
 
-          {/* Placeholder talents for demo */}
-          {filteredTalents.length === 0 &&
-            placeholderTalents
-              .filter((t) => {
-                if (activeFilter === "All") return true;
-                return t.role.toLowerCase().includes(activeFilter.toLowerCase());
-              })
-              .map((t) => (
-                <div key={t.name} className="group cursor-pointer">
-                  <div className="relative aspect-square rounded-2xl overflow-hidden mb-3">
-                    <div className={`absolute inset-0 bg-gradient-to-br ${t.color}`} />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="font-display text-6xl text-white/80 font-light">
-                        {t.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center rotate-[-30deg]">
-                      <span className="font-body text-4xl font-bold text-white/20 tracking-[0.2em]">DRAFT</span>
-                    </div>
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                  </div>
-                  <h3 className="font-body text-[15px] font-semibold text-[#0B0B0F]">{t.name}</h3>
-                  <p className="font-body text-[13px] text-[#6B6B73]">{t.role}</p>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Instagram className="w-3 h-3 text-[#9B9BA3]" />
-                    <span className="font-body text-[12px] text-[#9B9BA3]">{t.instagram}</span>
-                  </div>
-                </div>
-              ))}
+          {/* Loading / empty state */}
+          {loading && (
+            <div className="col-span-full flex justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#0B0B0F] border-t-transparent" />
+            </div>
+          )}
+          {!loading && filteredTalents.length === 0 && (
+            <div className="col-span-full text-center py-12">
+              <p className="font-body text-sm text-[#6B6B73]">No talent found.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
