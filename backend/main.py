@@ -29,7 +29,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from models import (
-    init_db, get_db, User, TalentProfile, BrandProfile, AgentProfile,
+    init_db, seed_demo_data, get_db, User, TalentProfile, BrandProfile, AgentProfile,
     TalentAgentLink, LicenseRequest, Contract, AuditLog, LicenseStatus,
 )
 from agents.orchestrator import OrchestratorAgent
@@ -42,6 +42,7 @@ orchestrator = OrchestratorAgent()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    seed_demo_data()
     yield
 
 

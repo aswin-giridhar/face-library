@@ -221,6 +221,189 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 
 
+def seed_demo_data():
+    """Populate DB with demo data if empty (so deploys aren't blank)."""
+    import hashlib
+    db = SessionLocal()
+    try:
+        if db.query(User).count() > 0:
+            return  # already seeded
+
+        # --- Users ---
+        talent_user = User(
+            email="emma@demo.test", name="Emma Clarke", role="talent",
+            password_hash=hashlib.sha256("demo123".encode()).hexdigest(),
+        )
+        brand_user = User(
+            email="james@luxbrand.test", name="James Wilson", role="brand",
+            company="LuxFashion UK",
+            password_hash=hashlib.sha256("demo123".encode()).hexdigest(),
+        )
+        talent_user2 = User(
+            email="marcus@demo.test", name="Marcus Chen", role="talent",
+            password_hash=hashlib.sha256("demo123".encode()).hexdigest(),
+        )
+        db.add_all([talent_user, brand_user, talent_user2])
+        db.flush()
+
+        # --- Talent Profiles ---
+        talent1 = TalentProfile(
+            user_id=talent_user.id,
+            bio="Award-winning fashion model and digital creator with 10+ years of experience in luxury and editorial campaigns across Europe and Asia.",
+            categories="Fashion,Beauty,Technology,Entertainment",
+            restricted_categories="Alcohol,Gambling,Political",
+            min_price_per_use=5000.0,
+            max_license_duration_days=365,
+            allow_ai_training=False,
+            allow_video_generation=True,
+            allow_image_generation=True,
+            geo_scope="global",
+            approval_mode="manual",
+            portfolio_description="High-fashion editorial, luxury brand campaigns, tech product launches",
+            instagram="@emmaclarke",
+            tiktok="@emmaclarke_official",
+        )
+        talent2 = TalentProfile(
+            user_id=talent_user2.id,
+            bio="Professional athlete and fitness influencer. Former Olympic sprinter turned brand ambassador for sports and wellness brands.",
+            categories="Sports,Healthcare,Technology,Food & Beverage",
+            restricted_categories="Alcohol,Gambling,Tobacco",
+            min_price_per_use=3500.0,
+            max_license_duration_days=180,
+            allow_ai_training=False,
+            allow_video_generation=True,
+            allow_image_generation=True,
+            geo_scope="UK,EU",
+            approval_mode="manual",
+            portfolio_description="Sports campaigns, fitness brand endorsements, wellness product launches",
+            instagram="@marcuschen",
+            youtube="@MarcusChenFitness",
+        )
+        db.add_all([talent1, talent2])
+        db.flush()
+
+        # --- Brand Profile ---
+        brand = BrandProfile(
+            user_id=brand_user.id,
+            company_name="LuxFashion UK",
+            industry="Fashion",
+            website="https://luxfashion.example.com",
+            description="Premium British fashion house specialising in sustainable luxury wear.",
+        )
+        db.add(brand)
+        db.flush()
+
+        # --- License Request (fully processed) ---
+        license1 = LicenseRequest(
+            brand_id=brand.id,
+            talent_id=talent1.id,
+            status="awaiting_approval",
+            use_case="Summer 2026 luxury fashion campaign — digital ads, social media, and e-commerce product pages featuring AI-generated lifestyle imagery.",
+            content_type="image",
+            desired_duration_days=90,
+            desired_regions="UK, EU",
+            proposed_price=6750.0,
+            risk_score="low",
+            risk_details='{"content_risk":"low","brand_risk":"low","legal_risk":"low","ethical_risk":"low","geographic_risk":"low"}',
+            negotiation_notes="Base price £5,000 adjusted to £6,750 for 90-day multi-region (UK+EU) image license. Includes 10% platform fee. Fair market rate for fashion editorial talent.",
+            compliance_notes="All checks passed. No restricted category overlap. GDPR-compliant processing. UK Copyright Act 1988 alignment confirmed.",
+            orchestration_status="completed",
+            fingerprint_id="FP-EMMA-2026-001",
+            gen_prompt="Professional fashion photography style. Emma Clarke, female model, early 30s, elegant features. Luxury summer collection setting — natural light, Mediterranean terrace backdrop. Wearing flowing silk dress in champagne gold. Confident, approachable expression. High-end editorial quality, soft bokeh background.",
+            payment_status="unpaid",
+        )
+        db.add(license1)
+        db.flush()
+
+        # --- Contract ---
+        contract = Contract(
+            license_id=license1.id,
+            contract_text="""INTELLECTUAL PROPERTY LICENSING AGREEMENT
+
+THIS AGREEMENT is made on the date of digital execution between:
+
+LICENSOR: Emma Clarke ("the Talent")
+LICENSEE: LuxFashion UK ("the Brand")
+
+1. DEFINITIONS AND INTERPRETATION
+"Licensed Material" means the AI-generated likeness of the Talent.
+"Permitted Use" means digital advertising, social media content, and e-commerce imagery.
+"Territory" means United Kingdom and European Union member states.
+"License Period" means 90 calendar days from the Effective Date.
+
+2. GRANT OF LICENSE
+The Licensor grants to the Licensee a non-exclusive, non-transferable license to use the Licensed Material for the Permitted Use within the Territory for the License Period.
+
+3. CONSIDERATION
+The Licensee shall pay the Licensor the sum of GBP 6,750 (six thousand seven hundred and fifty pounds) inclusive of platform fees.
+
+4. INTELLECTUAL PROPERTY RIGHTS
+All intellectual property rights in the Talent's likeness remain vested in the Licensor. The Licensee acquires no ownership rights.
+
+5. AI TRAINING RESTRICTION
+The Licensed Material shall NOT be used for training artificial intelligence models, machine learning systems, or any automated learning processes.
+
+6. DATA PROTECTION (GDPR)
+Both parties shall comply with the UK General Data Protection Regulation and the Data Protection Act 2018.
+
+7. CONTENT RESTRICTIONS
+The Licensed Material shall not be used in connection with: alcohol, gambling, political campaigns, tobacco, or any content that may bring the Talent into disrepute.
+
+8. MORAL RIGHTS
+The Licensor asserts their moral rights under Chapter IV of the Copyright, Designs and Patents Act 1988.
+
+9. TERMINATION
+Either party may terminate this Agreement with 30 days written notice. Upon termination, the Licensee shall cease all use of the Licensed Material within 14 days.
+
+10. DISPUTE RESOLUTION
+Any dispute shall be resolved through mediation under the CEDR Model Mediation Procedure, followed by arbitration under the Arbitration Act 1996 if necessary.
+
+11. GOVERNING LAW
+This Agreement shall be governed by and construed in accordance with the laws of England and Wales.
+
+12. CONSUMER RIGHTS
+Nothing in this Agreement affects the statutory rights of either party under the Consumer Rights Act 2015.
+
+Executed as a digital agreement through the Face Library platform.
+""",
+            generated_by="contract_agent",
+            model_used="glm-4-plus",
+            uk_law_compliant=True,
+            ip_clauses="Sections 4, 5, 8: IP retention, AI training restriction, moral rights assertion",
+        )
+        db.add(contract)
+
+        # --- Audit Logs ---
+        audit_entries = [
+            ("orchestrator", "pipeline_started", "License #1 pipeline initiated", "local", 0),
+            ("compliance", "risk_assessment", "Risk assessment completed: LOW risk across all 5 dimensions", "deepseek-v3.2", 1847),
+            ("compliance", "compliance_summary", "Executive summary generated — all checks passed", "glm-4-plus", 923),
+            ("negotiator", "price_negotiation", "Price set at £6,750 for 90-day UK+EU image license", "qwen3-235b-a22b-instruct-2507", 2105),
+            ("contract", "contract_generation", "12-section UK-law-compliant IP licensing agreement generated", "glm-4-plus", 3842),
+            ("gen_orchestrator", "avatar_prompt", "Generation prompt created for fashion editorial style", "deepseek-v3.2", 1203),
+            ("fingerprint", "likeness_scan", "Fingerprint ID FP-EMMA-2026-001 registered", "deepseek-v3.2", 856),
+            ("web3_contract", "onchain_rights", "ERC-721 metadata generated for Polygon deployment", "local", 0),
+            ("orchestrator", "pipeline_completed", "All 7 pipeline steps completed successfully", "local", 0),
+        ]
+        for agent, action, details, model, tokens in audit_entries:
+            db.add(AuditLog(
+                license_id=license1.id,
+                agent_name=agent,
+                action=action,
+                details=details,
+                model_used=model,
+                tokens_used=tokens,
+            ))
+
+        db.commit()
+        print("[Seed] Demo data inserted: 3 users, 2 talents, 1 brand, 1 license, 1 contract, 9 audit logs")
+    except Exception as e:
+        db.rollback()
+        print(f"[Seed] Error seeding demo data: {e}")
+    finally:
+        db.close()
+
+
 def get_db():
     db = SessionLocal()
     try:
