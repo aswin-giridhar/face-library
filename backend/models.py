@@ -286,6 +286,7 @@ def seed_demo_data():
             return
 
         demo_pw = _hash("demo123")
+        test_pw = _hash("test")
 
         # --- Users ---
         talent_user = User(
@@ -301,7 +302,22 @@ def seed_demo_data():
             email="marcus@demo.test", name="Marcus Chen", role="talent",
             password_hash=_hash("demo123"),
         )
-        db.add_all([talent_user, client_user, talent_user2])
+        # Test credentials (matching Figma prototype)
+        test_talent = User(
+            email="test@gmail.com", name="Olga Bonny", role="talent",
+            password_hash=test_pw,
+        )
+        test_agent = User(
+            email="agent@gmail.com", name="Demo Agent", role="agent",
+            company="Demo Agency",
+            password_hash=_hash("test"),
+        )
+        test_brand = User(
+            email="brand@gmail.com", name="Nike Brand Studio", role="client",
+            company="Nike Brand Studio",
+            password_hash=_hash("test"),
+        )
+        db.add_all([talent_user, client_user, talent_user2, test_talent, test_agent, test_brand])
         db.flush()
 
         # --- Talent Profiles ---
@@ -341,7 +357,35 @@ def seed_demo_data():
             instagram="@marcuschen",
             youtube="@MarcusChenFitness",
         )
-        db.add_all([talent1, talent2])
+        # Test talent profile
+        test_talent_profile = TalentProfile(
+            user_id=test_talent.id,
+            bio="Fashion and beauty talent based in London. Available for AI campaigns.",
+            stage_name="Olga Bonny",
+            categories="Model,Fashion,Beauty",
+            nationality="British",
+            gender="Female",
+            age=26,
+            restricted_categories="Alcohol,Gambling",
+            min_price_per_use=500.0,
+            max_license_duration_days=365,
+            allow_ai_training=False,
+            geo_scope="global",
+            approval_mode="manual",
+            instagram="@olgabonny",
+        )
+        db.add_all([talent1, talent2, test_talent_profile])
+        db.flush()
+
+        # Test agent profile
+        test_agent_profile = AgentProfile(
+            user_id=test_agent.id,
+            agency_name="Demo Agency",
+            industry="Fashion",
+            portfolio_url="https://demoagency.com",
+            instagram="@demoagency",
+        )
+        db.add(test_agent_profile)
         db.flush()
 
         # --- Client Profile ---
@@ -354,7 +398,17 @@ def seed_demo_data():
             referral_source="Google",
             description="Premium British fashion house specialising in sustainable luxury wear.",
         )
-        db.add(client)
+        # Test brand/client profile
+        test_client = ClientProfile(
+            user_id=test_brand.id,
+            company_name="Nike Brand Studio",
+            industry="Sportswear & Lifestyle",
+            website="https://nike.com",
+            role_title="CEO / Founder",
+            referral_source="Google",
+            description="Global sportswear and lifestyle brand.",
+        )
+        db.add_all([client, test_client])
         db.flush()
 
         # --- License Request (demo) ---
@@ -443,7 +497,7 @@ Executed as a digital agreement through the Face Library platform.
             ))
 
         db.commit()
-        print("[Seed] Demo data: 3 users, 2 talents, 1 client, 1 license, 1 contract")
+        print("[Seed] Demo data: 6 users, 3 talents, 2 clients, 1 agent, 1 license, 1 contract")
     except Exception as e:
         db.rollback()
         print(f"[Seed] Error: {e}")
